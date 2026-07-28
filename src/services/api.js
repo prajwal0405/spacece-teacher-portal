@@ -1363,3 +1363,30 @@ export function saveChildAssessment(childId, payload) {
   });
 }
 // End: Dnyaneshwari Thorat
+
+// --- UMANG Data APIs ---
+export const getUmangCurriculumMonths = () => request('/api/umang-data/curriculum-months');
+export const getUmangGraduateDimensions = () => request('/api/umang-data/graduate-dimensions');
+export const getUmangCapstoneTracks = () => request('/api/umang-data/capstone-tracks');
+export const getUmangInterviewQuestions = () => request('/api/umang-data/interview-questions');
+
+// --- Mentor Tracking Additional APIs ---
+export const submitMentorFeedback = (data) => request('/api/mentor/tracking/feedback', { method: 'POST', body: JSON.stringify(data) });
+export const getMentorAssignedMentees = () => request('/api/mentor/tracking/mentees');
+export const getMentorFellowAttendance = () => request('/api/mentor/tracking/fellow-attendance');
+export const logMentorFellowAttendance = (data) => request('/api/mentor/tracking/fellow-attendance', { method: 'POST', body: JSON.stringify(data) });
+
+
+export const addMenteeObservation = (data) => request('/api/mentor/tracking/observations', { method: 'POST', body: JSON.stringify(data) });
+export const addPdcaCycle = (data) => request('/api/mentor/tracking/pdca', { method: 'POST', body: JSON.stringify(data) });
+export const getPdcaCycles = () => request('/api/mentor/tracking/pdca');
+
+export const getMentorCurriculum = () => request('/api/mentor/tracking/curriculum');
+export const uploadCurriculumBulk = (formData) => request('/api/mentor/tracking/curriculum/bulk-upload', { 
+  method: 'POST', 
+  body: formData // if sending a file, else pass JSON if mocking
+});
+
+export const addCurriculumTopic = (data) => request('/api/mentor/tracking/curriculum/add-topic', { method: 'POST', body: JSON.stringify(data) });
+export const deleteCurriculumTopic = (planId, phaseId, topicId) => request(`/api/mentor/tracking/curriculum/topic/${planId}/${phaseId}/${topicId}`, { method: 'DELETE' });
+export const publishCurriculumPlan = (planId) => request(`/api/mentor/tracking/curriculum/publish/${planId}`, { method: 'POST' });

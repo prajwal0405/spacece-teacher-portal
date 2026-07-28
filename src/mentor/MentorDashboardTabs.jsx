@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { S, SectionCard, Toast, StatCard, StatusBadge, SearchBar, Modal } from "../components/Shared";
-import { uploadFile, submitFeedback, getFeedbacks, updateMentorMe, changeMentorPassword, recordMenteeObservation, getMenteeObservations, submitCapstoneMilestone, getCapstoneSubmissions, submitPDCACycle, getPDCACycles, getMentorFellows, updateFellowStatus, getMentorMe, updateMenteeTracking, claimFellow, unclaimFellow, deleteMentorFellow } from "../services/api";
+import { uploadFile, submitFeedback, getFeedbacks, updateMentorMe, changeMentorPassword, recordMenteeObservation, getMenteeObservations, submitCapstoneMilestone, getCapstoneSubmissions, submitPDCACycle, getPDCACycles, getMentorFellows, updateFellowStatus, getMentorMe, updateMenteeTracking, claimFellow, unclaimFellow, deleteMentorFellow, getMentorAssignedMentees, addPdcaCycle } from "../services/api";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -184,7 +184,7 @@ export function MentorProfileTab({ user, onWorkingCenterChange, onUserUpdate }) 
       <Toast msg={message} type={messageType} onClose={() => setMessage("")} />
       
       {/* ── Welcome Banner ── */}
-      <div style={{ background: "linear-gradient(135deg,#1e3a8a,#3b82f6)", borderRadius: 20, padding: "24px 28px", marginBottom: 24, color: "white", display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", overflow: "hidden" }}>
+      <div style={{ background: "linear-gradient(135deg,#b45309,#f59e0b)", borderRadius: 20, padding: "24px 28px", marginBottom: 24, color: "white", display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: -30, right: -30, width: 160, height: 160, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
         <div style={{ position: "relative", zIndex: 1 }}>
           <h1 style={{ fontSize: 22, fontWeight: 900, margin: "0 0 6px", letterSpacing: "-0.3px" }}>Welcome back, Mentor {user.name?.split(" ")[0] || ""}! 🚀</h1>
@@ -210,7 +210,7 @@ export function MentorProfileTab({ user, onWorkingCenterChange, onUserUpdate }) 
           <div style={{ fontSize: 14, fontWeight: 700, color: "#334155", marginBottom: 12 }}>🎓 Your Mentees:</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {user.mentorProfile.assignedTeachers.map((mentee, i) => (
-              <div key={mentee._id || i} style={{ background: "white", padding: "6px 12px", borderRadius: 20, fontSize: 13, fontWeight: 600, color: "#1e40af", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
+              <div key={mentee._id || i} style={{ background: "white", padding: "6px 12px", borderRadius: 20, fontSize: 13, fontWeight: 600, color: "#b45309", border: "1px solid #fde68a", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }}></div>
                 {mentee.name || "Unknown Fellow"}
               </div>
@@ -248,9 +248,9 @@ export function MentorProfileTab({ user, onWorkingCenterChange, onUserUpdate }) 
               <div style={{ position: "relative" }}>
                 <div style={{
                   width: 100, height: 100, borderRadius: "50%",
-                  background: "linear-gradient(135deg, #e0e7ff, #c7d2fe)",
+                  background: "linear-gradient(135deg, #fef3c7, #fde68a)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 36, fontWeight: 800, color: "#4f46e5",
+                  fontSize: 36, fontWeight: 800, color: "#d97706",
                   border: "4px solid white", boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                   overflow: "hidden"
                 }}>
@@ -271,9 +271,9 @@ export function MentorProfileTab({ user, onWorkingCenterChange, onUserUpdate }) 
                   style={{
                     position: "absolute", bottom: 0, right: -4,
                     width: 32, height: 32, borderRadius: "50%",
-                    background: "#3b82f6", color: "white", border: "2px solid white",
+                    background: "#f59e0b", color: "white", border: "2px solid white",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: uploadingPhoto ? "not-allowed" : "pointer", boxShadow: "0 2px 6px rgba(59,130,246,0.3)"
+                    cursor: uploadingPhoto ? "not-allowed" : "pointer", boxShadow: "0 2px 6px rgba(245,158,11,0.3)"
                   }}
                   title="Upload Photo"
                 >
@@ -1306,36 +1306,57 @@ export function ImpactCapstoneTab({ user, setToast, onUserUpdate }) {
 
 /* ── Documentation (PDCA) Tab ── */
 export function PDCATab({ user, setToast, onUserUpdate }) {
-  const [pdcaForm, setPdcaForm] = useState({ plan: "", do: "", check: "", act: "" });
-  const [submitting, setSubmitting] = useState(false);
-  const [history, setHistory] = useState([]);
+  const [pdcaList, setPdcaList] = useState([]);
+  const [mentees, setMentees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [newPdcaTitle, setNewPdcaTitle] = useState('');
+  const [newPdcaFellow, setNewPdcaFellow] = useState('');
+  const [newPdcaPhase, setNewPdcaPhase] = useState('Plan');
 
   const fetchCycles = () => {
     setLoading(true);
     getPDCACycles()
-      .then(res => setHistory(res.cycles || []))
+      .then(res => setPdcaList(res.cycles || []))
       .catch(err => console.error("Failed to fetch PDCA", err))
       .finally(() => setLoading(false));
   };
 
+  const fetchMentees = () => {
+    getMentorAssignedMentees()
+      .then(res => {
+        if (res.mentees && res.mentees.length > 0) {
+          setMentees(res.mentees);
+          setNewPdcaFellow(res.mentees[0].name || res.mentees[0].email);
+        }
+      })
+      .catch(err => console.error("Failed to fetch mentees", err));
+  };
+
   useEffect(() => {
     fetchCycles();
+    fetchMentees();
   }, []);
 
-  const handleSubmit = async (e) => {
+  const handleAddPdca = async (e) => {
     e.preventDefault();
-    if(!pdcaForm.plan || !pdcaForm.do || !pdcaForm.check || !pdcaForm.act) {
-      setToast?.({ msg: "Please fill out all PDCA fields.", type: "error" });
+    if (!newPdcaTitle || !newPdcaFellow) {
+      setToast?.({ msg: "Please fill out all fields.", type: "error" });
       return;
     }
     setSubmitting(true);
-    
     try {
-      const cycleNumber = history.length + 1;
-      await submitPDCACycle(cycleNumber, pdcaForm.plan, pdcaForm.do, pdcaForm.check, pdcaForm.act);
+      const payload = {
+        fellow: newPdcaFellow,
+        phase: newPdcaPhase,
+        title: newPdcaTitle,
+        status: "In Progress",
+        targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 1 week later
+      };
+      await addPdcaCycle(payload);
       setToast?.({ msg: "PDCA cycle recorded successfully!", type: "success" });
-      setPdcaForm({ plan: "", do: "", check: "", act: "" });
+      setNewPdcaTitle('');
       fetchCycles();
     } catch (err) {
       setToast?.({ msg: err.message || "Failed to save PDCA cycle", type: "error" });
@@ -1345,78 +1366,113 @@ export function PDCATab({ user, setToast, onUserUpdate }) {
   };
 
   return (
-    <div style={{ animation: "fadeIn 0.3s ease" }}>
-      <h1 style={S.pageTitle}>Documentation (PDCA)</h1>
-      <p style={S.pageSub}>Record and reflect on your Plan-Do-Check-Act cycles.</p>
+    <div style={{ animation: "fadeIn 0.3s ease", padding: "16px", display: "flex", flexDirection: "column", gap: "24px" }}>
+      <SectionCard title="Documentation (PDCA Framework)">
+        <p style={{ fontSize: "12px", color: "#64748b", marginTop: "-8px", marginBottom: "24px" }}>
+          Plan-Do-Check-Act quality assurance process for fellow community interventions.
+        </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-        <SectionCard title="🔄 New PDCA Cycle">
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{...S.label, display: "flex", alignItems: "center", gap: 6}}>
-                <span style={{background: "#e0e7ff", color: "#4f46e5", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 900}}>P</span>
-                PLAN (Objective & Strategy)
-              </label>
-              <textarea style={{...S.input, minHeight: 60}} value={pdcaForm.plan} onChange={e=>setPdcaForm({...pdcaForm, plan: e.target.value})} placeholder="What is the goal? What is the plan?" required />
-            </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "24px" }}>
+          
+          {/* Form to log PDCA */}
+          <div style={{ background: "white", padding: "20px", borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 1px 2px rgba(0,0,0,0.05)", height: "fit-content" }}>
+            <h3 style={{ fontSize: "14px", fontWeight: "bold", color: "#0f172a", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ color: "#d97706" }}>➕</span> Log New PDCA Cycle
+            </h3>
 
-            <div style={{ marginBottom: 16 }}>
-              <label style={{...S.label, display: "flex", alignItems: "center", gap: 6}}>
-                <span style={{background: "#fef3c7", color: "#d97706", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 900}}>D</span>
-                DO (Action Taken)
-              </label>
-              <textarea style={{...S.input, minHeight: 60}} value={pdcaForm.do} onChange={e=>setPdcaForm({...pdcaForm, do: e.target.value})} placeholder="How was the plan executed?" required />
-            </div>
+            <form onSubmit={handleAddPdca} style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "12px" }}>
+              <div>
+                <label style={{ display: "block", color: "#475569", fontWeight: "600", marginBottom: "4px" }}>Mentee Fellow</label>
+                <select 
+                  value={newPdcaFellow} 
+                  onChange={(e) => setNewPdcaFellow(e.target.value)}
+                  style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "8px", outline: "none" }}
+                >
+                  {mentees.length === 0 ? <option value="">No mentees found</option> : null}
+                  {mentees.map(m => (
+                    <option key={m._id || m.id} value={m.name || m.email}>{m.name || m.email}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div style={{ marginBottom: 16 }}>
-              <label style={{...S.label, display: "flex", alignItems: "center", gap: 6}}>
-                <span style={{background: "#d1fae5", color: "#059669", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 900}}>C</span>
-                CHECK (Results & Observations)
-              </label>
-              <textarea style={{...S.input, minHeight: 60}} value={pdcaForm.check} onChange={e=>setPdcaForm({...pdcaForm, check: e.target.value})} placeholder="What were the outcomes? What worked well?" required />
-            </div>
+              <div>
+                <label style={{ display: "block", color: "#475569", fontWeight: "600", marginBottom: "4px" }}>PDCA Phase</label>
+                <select 
+                  value={newPdcaPhase} 
+                  onChange={(e) => setNewPdcaPhase(e.target.value)}
+                  style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "8px", outline: "none" }}
+                >
+                  <option value="Plan">Plan (Design & Goal Setting)</option>
+                  <option value="Do">Do (Field Execution)</option>
+                  <option value="Check">Check (Data Analysis & Evaluation)</option>
+                  <option value="Act">Act (Scaling & Standardization)</option>
+                </select>
+              </div>
 
-            <div style={{ marginBottom: 24 }}>
-              <label style={{...S.label, display: "flex", alignItems: "center", gap: 6}}>
-                <span style={{background: "#fee2e2", color: "#dc2626", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 900}}>A</span>
-                ACT (Next Steps & Adjustments)
-              </label>
-              <textarea style={{...S.input, minHeight: 60}} value={pdcaForm.act} onChange={e=>setPdcaForm({...pdcaForm, act: e.target.value})} placeholder="What changes will you make for the next cycle?" required />
-            </div>
+              <div>
+                <label style={{ display: "block", color: "#475569", fontWeight: "600", marginBottom: "4px" }}>Intervention Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Parent ECE Workshop in Sector 4"
+                  value={newPdcaTitle}
+                  onChange={(e) => setNewPdcaTitle(e.target.value)}
+                  style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "8px", outline: "none" }}
+                />
+              </div>
 
-            <button type="submit" disabled={submitting} style={{...S.primaryBtn, width: "100%", opacity: submitting ? 0.7 : 1}}>
-              {submitting ? "Saving..." : "Save PDCA Cycle"}
-            </button>
-          </form>
-        </SectionCard>
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{
+                  width: "100%",
+                  background: "#f59e0b",
+                  color: "#fff",
+                  fontWeight: "bold",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  border: "none",
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  marginTop: "8px"
+                }}
+              >
+                {submitting ? "Saving..." : "Add PDCA Tracker Entry"}
+              </button>
+            </form>
+          </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <SectionCard title="📚 PDCA History">
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {history.length === 0 ? (
-                <div style={{ padding: 20, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>No PDCA cycles recorded yet.</div>
-              ) : history.map((item, i) => (
-                <div key={item._id || i} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>{new Date(item.date).toLocaleDateString("en-US", { month:"short", day:"2-digit", year:"numeric" })}</div>
-                    <div style={{ fontSize: 10, fontWeight: 800, background: "#d1fae5", color: "#059669", padding: "2px 8px", borderRadius: 10 }}>{item.status || "Completed"}</div>
+          {/* PDCA Cards List */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {loading ? (
+              <div style={{ textAlign: "center", padding: "20px", color: "#64748b" }}>Loading history...</div>
+            ) : pdcaList.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "20px", color: "#64748b" }}>No PDCA cycles found.</div>
+            ) : (
+              pdcaList.map((item) => (
+                <div key={item._id || item.id} style={{
+                  background: "white", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0",
+                  display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                      <span style={{ padding: "2px 8px", background: "#fef3c7", color: "#92400e", fontWeight: "bold", fontSize: "10px", borderRadius: "4px", textTransform: "uppercase" }}>
+                        {item.phase}
+                      </span>
+                      <span style={{ fontSize: "12px", fontWeight: "bold", color: "#0f172a" }}>{item.fellow}</span>
+                    </div>
+                    <h4 style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", margin: 0 }}>{item.title}</h4>
+                    <p style={{ fontSize: "11px", color: "#94a3b8", margin: "4px 0 0 0" }}>Target Completion: {item.targetDate || "N/A"}</p>
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 8 }}>{item.plan.substring(0, 60) + (item.plan.length > 60 ? "..." : "")}</div>
-                  <button onClick={() => setToast?.({ msg: `Plan: ${item.plan}\nDo: ${item.do}\nCheck: ${item.check}\nAct: ${item.act}`, type: "info" })} style={{ background: "none", border: "none", color: "#3b82f6", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0 }}>View Full Cycle →</button>
+                  
+                  <span style={{ padding: "4px 10px", background: "#f1f5f9", color: "#334155", fontWeight: "600", fontSize: "12px", borderRadius: "9999px" }}>
+                    {item.status || "In Progress"}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </SectionCard>
+              ))
+            )}
+          </div>
 
-          <SectionCard title="💡 PDCA Tips">
-            <ul style={{ paddingLeft: 20, margin: 0, color: "#475569", fontSize: 13, lineHeight: 1.6 }}>
-              <li style={{marginBottom: 8}}>Keep objectives SMART (Specific, Measurable, Achievable, Relevant, Time-bound).</li>
-              <li style={{marginBottom: 8}}>Document data and specific observations in the <strong>Check</strong> phase.</li>
-              <li>Use the <strong>Act</strong> phase to refine your strategy for the next iteration.</li>
-            </ul>
-          </SectionCard>
         </div>
-      </div>
+      </SectionCard>
     </div>
   );
 }

@@ -6124,8 +6124,10 @@ app.use("/api/parent-session-assignments", parentSessionAssignmentsRouter);
 
 import mentorTrackingRouter from "./routes/mentorTracking.js";
 import mentorCurriculumRouter from "./routes/mentorCurriculum.js";
+import umangDataRouter from "./routes/umangData.js";
 app.use("/api/mentor/tracking", requireAuth, requireRole("mentor"), mentorTrackingRouter);
 app.use("/api/mentor/curriculum", requireAuth, mentorCurriculumRouter);
+app.use("/api/umang-data", requireAuth, umangDataRouter);
 
 await connectDb();
 await ensureDatabaseReady();

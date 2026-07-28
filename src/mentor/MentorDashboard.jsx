@@ -258,7 +258,7 @@ export default function MentorDashboard({ user, onLogout }) {
         if (res.ok) {
           setNotifications(data.notifications.map(n => ({
             id: n._id,
-            type: "info",
+            type: n.type || "info",
             msg: n.body,
             title: n.title,
             time: new Date(n.createdAt).toLocaleTimeString(),

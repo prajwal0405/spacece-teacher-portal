@@ -65,13 +65,16 @@ const curriculumPlanSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    assignedFellow: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
     title: {
       type: String,
       required: true,
     },
     durationType: {
       type: String,
-      enum: ["1yr", "2yr"],
       required: true,
     },
     status: {
@@ -79,6 +82,8 @@ const curriculumPlanSchema = new mongoose.Schema(
       enum: ["draft", "published"],
       default: "draft",
     },
+    sourceFileName: String,
+    sourceFileUrl: String,
   },
   { timestamps: true }
 );
