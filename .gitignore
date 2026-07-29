@@ -44,3 +44,13 @@ teacher-training-backend/
 
 # Empty directories
 uploads/
+
+# Build output
+dist/
+
+# Generated Excel files
+*.xlsx
+
+# Local helper scripts
+fix_backend.py
+fix_backend_2.py
