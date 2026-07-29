@@ -4,7 +4,7 @@ import { t } from "../services/i18n";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
-export default function MentorActivitiesTab({ user, setToast }) {
+export default function TeacherActivitiesTab({ user, setToast }) {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [reviewingId, setReviewingId] = useState(null);
@@ -97,7 +97,7 @@ export default function MentorActivitiesTab({ user, setToast }) {
                 <option value="rejected">Reject</option>
               </select>
               <textarea 
-                placeholder="Leave remarks or feedback for the fellow..."
+                placeholder="Leave remarks or feedback for the Teacher..."
                 value={adminComments}
                 onChange={e => setAdminComments(e.target.value)}
                 rows={3}
@@ -123,7 +123,7 @@ export default function MentorActivitiesTab({ user, setToast }) {
 
   return (
     <div style={{ animation: "fadeIn 0.3s ease" }}>
-      <h2 style={{ fontSize: 24, fontWeight: 700, color: "#1e293b", marginBottom: 24 }}>Fellow Activities</h2>
+      <h2 style={{ fontSize: 24, fontWeight: 700, color: "#1e293b", marginBottom: 24 }}>Teacher Activities</h2>
       
       {loading ? (
         <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Loading activities...</div>

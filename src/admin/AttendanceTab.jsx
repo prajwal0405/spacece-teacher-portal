@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { StatCard, SectionCard } from "../components/Shared";
-import { getTeacherAttendance, sendAdminNotification } from "../services/api";
+import { getTeacherAttendance, saveTeacherAttendance, sendAdminNotification, getMentorAttendanceByAdmin, getAdminMentors, getAdminTeachers } from "../services/api";
 
 const STATUS_COLORS = {
   present: { bg: "#10b981", light: "#d1fae5", text: "#065f46" },
@@ -42,7 +42,7 @@ const MiniBarChart = ({ data, color = "#f59e0b", height = 100 }) => {
   return (
     <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height, padding: "0 2px" }}>
       {data.map((d, i) => (
-        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+        <div key={i} style={{ flex: 1, height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", gap: 3 }}>
           <span style={{ fontSize: 9, fontWeight: 700, color: "#374151" }}>{d.val || 0}</span>
           <div style={{ width: "100%", height: `${Math.max(((d.val || 0) / max) * 100, 4)}%`, background: color, borderRadius: 3, transition: "height 0.3s" }} />
           <span style={{ fontSize: 8, color: "#9ca3af", fontWeight: 600 }}>{d.label}</span>
@@ -52,27 +52,74 @@ const MiniBarChart = ({ data, color = "#f59e0b", height = 100 }) => {
   );
 };
 
-export default function AttendanceTab({ teachers = [] }) {
+export default function AttendanceTab({ teachers: initialTeachers = [], isMentorView = false }) {
+  const [activeRole, setActiveRole] = useState("teacher");
+  const [users, setUsers] = useState(initialTeachers);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [selectedTeacherId, setSelectedTeacherId] = useState("");
+  const [logDate, setLogDate] = useState("");
+  const [logCheckIn, setLogCheckIn] = useState("09:00");
+  const [logCheckOut, setLogCheckOut] = useState("17:00");
+  const [logStatus, setLogStatus] = useState("present");
+  const [logLocation, setLogLocation] = useState("");
+
+  const fetchAttendance = () => {
     setLoading(true);
-    getTeacherAttendance(dateFilter ? { date: dateFilter } : {})
-      .then((data) => setRecords(data?.records || []))
-      .catch((error) => console.error("Failed to load teacher attendance", error))
+    const params = dateFilter ? { date: dateFilter } : {};
+    const fetchRecords = activeRole === "teacher" ? getTeacherAttendance(params) : getMentorAttendanceByAdmin(params);
+    const fetchUsers = activeRole === "teacher" ? getAdminTeachers() : getAdminMentors();
+
+    Promise.all([fetchRecords, fetchUsers])
+      .then(([recordsData, usersData]) => {
+        setRecords(recordsData?.records || []);
+        let fetchedUsers = [];
+        if (activeRole === "teacher") {
+          fetchedUsers = usersData?.teachers || usersData?.fellows || usersData?.mentees || [];
+        } else {
+          fetchedUsers = usersData?.mentors || usersData || [];
+        }
+        setUsers(fetchedUsers);
+      })
+      .catch((error) => console.error("Failed to load attendance", error))
       .finally(() => setLoading(false));
-  }, [dateFilter]);
+  };
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [dateFilter, activeRole]);
+
+  const handleLogAttendance = async () => {
+    if (!selectedTeacherId || !logDate) return alert("Please select a teacher and date");
+    try {
+      await saveTeacherAttendance({
+        teacher: selectedTeacherId,
+        attendanceDate: logDate,
+        checkInTime: logCheckIn,
+        checkOutTime: logCheckOut,
+        status: logStatus,
+        source: "manual",
+        note: logLocation || "Manual Entry"
+      });
+      setShowLogModal(false);
+      fetchAttendance();
+    } catch (e) {
+      alert("Failed to save attendance");
+    }
+  };
 
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
     return records.filter((record) => {
-      const teacherName = String(record.teacher?.name || "").toLowerCase();
-      const teacherEmail = String(record.teacher?.email || "").toLowerCase();
-      const matchesSearch = !query || teacherName.includes(query) || teacherEmail.includes(query);
+      const u = record.teacher || record.mentor || {};
+      const userName = String(u.name || "").toLowerCase();
+      const userEmail = String(u.email || "").toLowerCase();
+      const matchesSearch = !query || userName.includes(query) || userEmail.includes(query);
       const matchesStatus = statusFilter === "all" || record.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
@@ -86,35 +133,35 @@ export default function AttendanceTab({ teachers = [] }) {
     excused: filteredRecords.filter((r) => r.status === "excused").length,
   }), [filteredRecords]);
 
-  const attendanceByTeacher = useMemo(() => {
-    return teachers
-      .filter((t) => t.status === "approved")
-      .map((teacher) => {
-        const teacherRecords = records.filter((r) => String(r.teacher?._id || r.teacher) === String(teacher._id));
-        const presentCount = teacherRecords.filter((r) => ["present", "late"].includes(r.status)).length;
-        const pct = teacherRecords.length ? Math.round((presentCount / teacherRecords.length) * 100) : 0;
-        return { teacher, pct, count: teacherRecords.length, absentCount: teacherRecords.filter(r => r.status === "absent").length };
+  const attendanceByUser = useMemo(() => {
+    return users
+      .filter((u) => u.status === "approved")
+      .map((user) => {
+        const userRecords = records.filter((r) => String(r.teacher?._id || r.teacher || r.mentor?._id || r.mentor) === String(user._id));
+        const presentCount = userRecords.filter((r) => ["present", "late"].includes(r.status)).length;
+        const pct = userRecords.length ? Math.round((presentCount / userRecords.length) * 100) : 0;
+        return { user, pct, count: userRecords.length, absentCount: userRecords.filter(r => r.status === "absent").length };
       })
       .sort((a, b) => a.pct - b.pct);
-  }, [records, teachers]);
+  }, [records, users]);
 
-  /* ── Absent Teacher Flagging ── */
-  const flaggedTeachers = useMemo(() => {
-    return attendanceByTeacher.filter(item => {
+  /* ── Absent User Flagging ── */
+  const flaggedUsers = useMemo(() => {
+    return attendanceByUser.filter(item => {
       if (item.count === 0) return true; // No attendance records at all
       if (item.pct < 50) return true; // Less than 50% attendance
       // Check for 3+ consecutive absences
-      const teacherRecords = records
-        .filter(r => String(r.teacher?._id || r.teacher) === String(item.teacher._id))
+      const userRecords = records
+        .filter(r => String(r.teacher?._id || r.teacher || r.mentor?._id || r.mentor) === String(item.user._id))
         .sort((a, b) => new Date(b.attendanceDate) - new Date(a.attendanceDate));
       let consecutive = 0;
-      for (const r of teacherRecords.slice(0, 5)) {
+      for (const r of userRecords.slice(0, 5)) {
         if (r.status === "absent") consecutive++;
         else break;
       }
       return consecutive >= 3;
     });
-  }, [attendanceByTeacher, records]);
+  }, [attendanceByUser, records]);
 
   /* ── Weekly Trend Data (last 4 weeks) ── */
   const weeklyTrend = useMemo(() => {
@@ -168,13 +215,32 @@ export default function AttendanceTab({ teachers = [] }) {
     <div style={{ animation: "fadeIn 0.3s ease" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
-          <h1 style={S.pageTitle}>Teacher Attendance</h1>
-          <p style={S.pageSub}>Live attendance records with trend analysis and absent-teacher flagging.</p>
+          <h1 style={S.pageTitle}>Attendance Management</h1>
+          <p style={S.pageSub}>Monitor {activeRole} attendance, identify trends, and review daily logs.</p>
         </div>
-        <button onClick={() => exportCsv("teacher-attendance.csv", [
-          ["Teacher", "Email", "Date", "Status", "Source", "Note"],
-          ...filteredRecords.map(r => [r.teacher?.name || "", r.teacher?.email || "", r.attendanceDate ? new Date(r.attendanceDate).toLocaleDateString("en-IN") : "", r.status, r.source || "", r.note || ""])
-        ])} style={S.exportBtn}>📥 Export CSV</button>
+        {!isMentorView && (
+          <div style={{ display: "flex", gap: 8, background: "#f1f5f9", padding: 4, borderRadius: 10 }}>
+            <button 
+              onClick={() => setActiveRole("teacher")}
+              style={{ ...S.tblBtn, background: activeRole === "teacher" ? "white" : "transparent", border: activeRole === "teacher" ? "1.5px solid #e2e8f0" : "none", color: activeRole === "teacher" ? "#0f172a" : "#64748b" }}>
+              Teachers
+            </button>
+            <button 
+              onClick={() => setActiveRole("mentor")}
+              style={{ ...S.tblBtn, background: activeRole === "mentor" ? "white" : "transparent", border: activeRole === "mentor" ? "1.5px solid #e2e8f0" : "none", color: activeRole === "mentor" ? "#0f172a" : "#64748b" }}>
+              Mentors
+            </button>
+          </div>
+        )}
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button onClick={() => setShowLogModal(true)} style={{ ...S.primaryBtn, background: "#10b981" }}>+ Log Entry</button>
+          <button onClick={() => exportCsv(`${activeRole}-attendance.csv`, [
+            ["Name", "Email", "Date", "Status", "Source", "Note"],
+            ...filteredRecords.map(r => [r.teacher?.name || r.mentor?.name || "", r.teacher?.email || r.mentor?.email || "", r.attendanceDate ? new Date(r.attendanceDate).toLocaleDateString("en-IN") : "", r.status, r.source || "", r.note || ""])
+          ])} style={S.exportBtn}>📥 Export CSV</button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -183,7 +249,7 @@ export default function AttendanceTab({ teachers = [] }) {
         <StatCard icon="✅" label="Present" val={summary.present} color="#10b981" bg="#d1fae5" />
         <StatCard icon="⏰" label="Late" val={summary.late} color="#f59e0b" bg="#fef3c7" />
         <StatCard icon="❌" label="Absent" val={summary.absent} color="#ef4444" bg="#fee2e2" />
-        <StatCard icon="🚨" label="Flagged Teachers" val={flaggedTeachers.length} color="#dc2626" bg="#fee2e2" />
+        <StatCard icon="🚨" label={`Flagged ${activeRole === "mentor" ? "Mentors" : "Teachers"}`} val={flaggedUsers.length} color="#dc2626" bg="#fee2e2" />
       </div>
 
       {/* Trend Charts */}
@@ -206,22 +272,22 @@ export default function AttendanceTab({ teachers = [] }) {
       </div>
 
       {/* Flagged Teachers Alert */}
-      {flaggedTeachers.length > 0 && (
+      {flaggedUsers.length > 0 && (
         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 14, padding: 18, marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <span style={{ fontSize: 20 }}>🚨</span>
-            <span style={{ fontSize: 14, fontWeight: 800, color: "#991b1b" }}>Absent Teachers Flagged ({flaggedTeachers.length})</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: "#991b1b" }}>Absent Users Flagged ({flaggedUsers.length})</span>
           </div>
           <div style={{ fontSize: 12, color: "#b91c1c", marginBottom: 12 }}>Teachers with &lt;50% attendance or 3+ consecutive absences need attention.</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {flaggedTeachers.map(item => (
-              <div key={item.teacher._id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "white", borderRadius: 10, padding: "10px 14px", border: "1px solid #fecaca" }}>
+            {flaggedUsers.map(item => (
+              <div key={item.user._id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "white", borderRadius: 10, padding: "10px 14px", border: "1px solid #fecaca" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: "#991b1b" }}>
-                    {item.teacher.name?.[0]?.toUpperCase() || "?"}
+                    {item.user.name?.[0]?.toUpperCase() || "?"}
                   </div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1c1917" }}>{item.teacher.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1c1917" }}>{item.user.name}</div>
                     <div style={{ fontSize: 11, color: "#6b7280" }}>{item.count} records · {item.pct}% attendance · {item.absentCount} absences</div>
                   </div>
                 </div>
@@ -284,10 +350,10 @@ export default function AttendanceTab({ teachers = [] }) {
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: 14, fontWeight: 800, color: "white", flexShrink: 0,
                     }}>
-                      {(record.teacher?.name || "T")[0]?.toUpperCase()}
+                      {((record.teacher?.name || record.mentor?.name) || "U")[0]?.toUpperCase()}
                     </div>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{record.teacher?.name || "Unknown"}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{record.teacher?.name || record.mentor?.name || "Unknown"}</div>
                       <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
                         📅 {recordDate ? recordDate.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) : "—"}
                         · {record.source === "geo" ? "📍 Geo" : "📝 Manual"}
@@ -305,18 +371,18 @@ export default function AttendanceTab({ teachers = [] }) {
         )}
       </div>
 
-      {/* Teacher Attendance Rankings */}
+      {/* User Attendance Rankings */}
       <div style={{ background: "white", borderRadius: 16, border: "1px solid #e5e7eb", padding: 20, marginTop: 20 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 12 }}>👩‍🏫 Teacher Attendance Rankings</div>
-        {attendanceByTeacher.length === 0 ? (
-          <div style={{ color: "#9ca3af", fontSize: 13 }}>No approved teachers found</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 12 }}>🏆 {activeRole === "mentor" ? "Mentor" : "Teacher"} Attendance Rankings</div>
+        {attendanceByUser.length === 0 ? (
+          <div style={{ color: "#9ca3af", fontSize: 13 }}>No approved {activeRole}s found</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 400, overflowY: "auto" }}>
-            {attendanceByTeacher.map((item, idx) => {
+            {attendanceByUser.map((item, idx) => {
               const badgeColor = item.pct >= 85 ? "#10b981" : item.pct >= 60 ? "#f59e0b" : "#ef4444";
-              const isFlagged = flaggedTeachers.some(f => f.teacher._id === item.teacher._id);
+              const isFlagged = flaggedUsers.some(f => f.user._id === item.user._id);
               return (
-                <div key={item.teacher._id} style={{
+                <div key={item.user._id} style={{
                   display: "flex", alignItems: "center", gap: 12,
                   padding: "10px 12px", borderRadius: 10,
                   background: isFlagged ? "#fef2f2" : "#f9fafb",
@@ -332,7 +398,7 @@ export default function AttendanceTab({ teachers = [] }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{item.teacher.name}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{item.user.name}</span>
                       {isFlagged && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 8, background: "#fee2e2", color: "#991b1b", fontWeight: 700 }}>⚠️ FLAGGED</span>}
                     </div>
                     <div style={{ height: 5, background: "#f3f4f6", borderRadius: 3, overflow: "hidden", marginTop: 4 }}>
@@ -349,6 +415,54 @@ export default function AttendanceTab({ teachers = [] }) {
           </div>
         )}
       </div>
+
+      {showLogModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn 0.2s ease" }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, width: "100%", maxWidth: 400, boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ margin: "0 0 20px 0", fontSize: 18, fontWeight: 800, color: "#111827" }}>Log Manual Attendance</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4, display: "block" }}>Select {activeRole === "mentor" ? "Mentor" : "Teacher"} *</label>
+                <select style={{ ...S.input, padding: "8px 12px" }} value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)}>
+                  <option value="">-- Choose {activeRole === "mentor" ? "Mentor" : "Teacher"} --</option>
+                  {users.filter(t => t.status === "approved").map(t => <option key={t._id} value={t._id}>{t.name} ({t.email})</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4, display: "block" }}>Date *</label>
+                <input type="date" style={{ ...S.input, padding: "8px 12px" }} value={logDate} onChange={e => setLogDate(e.target.value)} />
+              </div>
+              <div style={{ display: "flex", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4, display: "block" }}>Check In</label>
+                  <input type="time" style={{ ...S.input, padding: "8px 12px" }} value={logCheckIn} onChange={e => setLogCheckIn(e.target.value)} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4, display: "block" }}>Check Out</label>
+                  <input type="time" style={{ ...S.input, padding: "8px 12px" }} value={logCheckOut} onChange={e => setLogCheckOut(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4, display: "block" }}>Status *</label>
+                <select style={{ ...S.input, padding: "8px 12px" }} value={logStatus} onChange={e => setLogStatus(e.target.value)}>
+                  <option value="present">Present</option>
+                  <option value="late">Late</option>
+                  <option value="absent">Absent</option>
+                  <option value="excused">Excused</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4, display: "block" }}>Note / Location</label>
+                <input style={{ ...S.input, padding: "8px 12px" }} value={logLocation} onChange={e => setLogLocation(e.target.value)} placeholder="e.g. Field visit, Sick leave" />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 12 }}>
+                <button onClick={() => setShowLogModal(false)} style={{ ...S.exportBtn }}>Cancel</button>
+                <button onClick={handleLogAttendance} style={{ ...S.primaryBtn }}>Save Attendance</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

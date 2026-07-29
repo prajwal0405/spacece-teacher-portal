@@ -3,12 +3,10 @@ import { Logo, Toast, globalCSS } from "../components/Shared";
 import { t } from "../services/i18n";
 import OverviewTab from "../admin/OverviewTab";
 import CenterManagementTab from "../admin/CenterManagementTab";
-import TeacherManagementTab from "../admin/TeacherManagementTab";
-import LessonPlanManagementTab from "../admin/LessonPlanManagementTab";
+import MentorManagementTab from "../admin/MentorManagementTab";
 import CurriculumTrainingTab from "../admin/CurriculumTrainingTab";
 import ActivityMonitoringTab from "../admin/ActivityMonitoringTab";
 import ChildrenManagementTab from "../admin/ChildrenManagement";
-import TrainerManagementTab from "../admin/TrainerManagementTab";
 import AssignmentReviewTab from "../admin/AssignmentReviewTab";
 import AttendanceTab from "../admin/AttendanceTab";
 import ReportsTab from "../admin/ReportsTab";
@@ -95,10 +93,7 @@ export default function AdminDashboard({ user, onLogout }) {
     { key:"teachers",     label:"User Management",icon:"\uD83D\uDC69\u200D\uD83C\uDFEB", badge:pending.length },
     { key: "curriculum", label: "Course Management", icon: "\uD83D\uDCDA" },
     { key: "activities", label: "Activity Monitoring", icon: "\uD83D\uDCF8" },
-    { key: "lessonplans", label: "Lesson Plans", icon: "\uD83D\uDCCB" },
-
     { key: "children", label: "Children & Classes", icon: "\uD83D\uDC76" },
-    { key:"trainers",     label:"Trainer Management",icon:"\uD83C\uDF93" },
     { key:"attendance",   label:"Attendance",        icon:"\uD83D\uDCC5" },
    
     { key:"reports",      label:"Reports & Analytics",icon:"\uD83D\uDCC8" },
@@ -127,13 +122,11 @@ export default function AdminDashboard({ user, onLogout }) {
     switch(activeTab) {
       case "overview":     return <OverviewTab teachers={teachers} courses={courses} batches={[]} sessions={[]}/>;
       case "centers": return <CenterManagementTab allTeachers={teachers} setToast={setToast}/>;
-      case "teachers": return <TeacherManagementTab teachers={teachers} setTeachers={persistTeachers} setToast={setToast}/>;
+      case "teachers": return <MentorManagementTab setToast={setToast}/>;
       case "curriculum": return <CurriculumTrainingTab setToast={setToast}/>;
       // case "assessments": return <AssessmentResultsTab setToast={setToast}/>;
       case "activities": return <ActivityMonitoringTab setToast={setToast}/>;
-      case "lessonplans": return <LessonPlanManagementTab setToast={setToast} />;
       case "children": return <ChildrenManagementTab setToast={setToast}/>;
-      case "trainers": return <TrainerManagementTab batches={[]} setToast={setToast}/>;
       case "attendance":   return <AttendanceTab teachers={teachers} sessions={[]}/>;
       case "reports":      return <ReportsTab teachers={teachers} courses={courses} batches={[]}/>;
       case "notifications":return <NotificationsTab teachers={teachers} setToast={setToast}/>;

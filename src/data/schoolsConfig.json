@@ -1,0 +1,18 @@
+{
+  "centers": [
+    { "id": "udaan-dhayari", "name": "Udaan Centre, Dhayari, Pune" },
+    { "id": "umang-karve", "name": "Umang Centre, Gosavi Vasti, Karve Nagar, Pune" },
+    { "id": "umang-shivane", "name": "Umang Centre, Shivane, Pune" }
+  ],
+  "mavalSchools": [
+    { "id": 13, "name": "Shri Chhtrapati Shivaji Vcidya Mandir, Kanhe" },
+    { "id": 14, "name": "Shriram Vidyalaya, Navalakh Umbre" },
+    { "id": 15, "name": "Z P Primary Schoool, Bhoyare" },
+    { "id": 16, "name": "Z.P. Primary School,Ambi" },
+    { "id": 17, "name": "Z.P. Primary School, Badhalwadi" },
+    { "id": 18, "name": "Z.P.Primary School Nanoli Tarfe Chakan" },
+    { "id": 19, "name": "Z.P. Primary School, Navlakh Umbre" },
+    { "id": 20, "name": "Z.P. Primary School, Urse" },
+    { "id": 21, "name": "Z.P. Primary School, Varale" }
+  ]
+}

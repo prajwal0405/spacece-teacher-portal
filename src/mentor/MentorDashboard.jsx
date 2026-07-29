@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
-import { Logo, Toast, Badge, StatusBadge, StatCard, SectionCard, S, globalCSS } from "../components/Shared";
+import { useState, useEffect, useMemo } from "react";
+import { Logo, Toast, Badge, StatusBadge, StatCard, SectionCard, S, globalCSS, BarChart } from "../components/Shared";
 import { t } from "../services/i18n";
 import { getStoredSession, getMyCenter, getMentorMe } from "../services/api";
-import { MentorProfileTab, MentorNotificationsTab, MentorFeedbackTab, MenteeManagementTab, ImpactCapstoneTab, PDCATab } from "./MentorDashboardTabs";
-import MentorActivitiesTab from "./MentorActivitiesTab";
-import MentorFellowAttendanceTab from "./MentorFellowAttendanceTab";
+import { MentorProfileTab, MentorNotificationsTab, MentorFeedbackTab, ImpactCapstoneTab, PDCATab } from "./MentorDashboardTabs";
+import TeacherActivitiesTab from "./TeacherActivitiesTab";
 import MentorAttendanceTab from "./MentorAttendanceTab";
-import MentorCurriculumTab from "./MentorCurriculumTab";
-import { getPDCACycles, getCapstoneSubmissions, getMenteeObservations } from "../services/api";
+import TeacherCurriculumTab from "./TeacherCurriculumTab";
+import TeacherManagementTab from "./TeacherManagementTab";
+import AttendanceTab from "../admin/AttendanceTab";
+import { getPDCACycles, getCapstoneSubmissions, getTeacherObservations } from "../services/api";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -45,6 +46,79 @@ function UnderConstructionTab({ label = "This page", icon = "🚧" }) {
 }
 
 /* ── OverviewTab ── */
+
+function buildMonthlyRegistrations(teachers) {
+  const now = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const month = date.toLocaleString("en-IN", { month: "short" });
+    const count = teachers.filter((t) => {
+      const d = t.createdAt ? new Date(t.createdAt) : null;
+      return d && d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear();
+    }).length;
+    months.push({ month, val: count });
+  }
+  return months;
+}
+
+function DonutChart({ value, max, color, size = 64 }) {
+  const pct = max > 0 ? Math.min(Math.round((value / max) * 100), 100) : 0;
+  const r = 24, cx = size / 2, cy = size / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = (pct / 100) * circ;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f3f4f6" strokeWidth={6} />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={6}
+        strokeDasharray={`${dash} ${circ - dash}`}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${cx} ${cy})`} />
+      <text x={cx} y={cy + 5} textAnchor="middle" fontSize="11" fontWeight="800" fill={color}>{pct}%</text>
+    </svg>
+  );
+}
+
+function ActivityItem({ icon, text, time, color }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid #f8fafc" }}>
+      <div style={{ width: 34, height: 34, borderRadius: 10, background: `${color}15`,
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#1c1917", lineHeight: 1.4 }}>{text}</div>
+        <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{time}</div>
+      </div>
+    </div>
+  );
+}
+
+
+function getTeacherScore(t) {
+  if (t.teacherProfile?.performanceRating > 0) return Math.round(t.teacherProfile.performanceRating * 20);
+  let dynamicScore = 0;
+  const tp = t.teacherProfile || {};
+  if (tp.communityProfilingStatus === "completed") dynamicScore += 25;
+  if (tp.communityImmersionStatus === "completed") dynamicScore += 25;
+  if (tp.curriculumImplementationStatus === "completed") dynamicScore += 25;
+  if (tp.coursesCompleted > 0 && tp.coursesAssigned > 0) {
+      dynamicScore += Math.round((tp.coursesCompleted / tp.coursesAssigned) * 25);
+  } else if (tp.coursesCompleted > 0) {
+      dynamicScore += 25;
+  }
+  return dynamicScore > 100 ? 100 : dynamicScore;
+}
+
+function getInitialsAvatar(name, i) {
+  const initials = (name || "T").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
+  const colors = ["#ef4444", "#ef4444", "#ef4444", "#8b5cf6", "#3b82f6"];
+  const color = colors[i % colors.length];
+  return (
+    <div style={{ width: 40, height: 40, borderRadius: "50%", background: color, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, flexShrink: 0, boxShadow: "0 2px 5px rgba(0,0,0,0.1)" }}>
+      {initials}
+    </div>
+  );
+}
+
 function OverviewTab({ user, workingCenter }) {
   const [pdcaCount, setPdcaCount] = useState(0);
   const [capstoneSubmissionsCount, setCapstoneCount] = useState(0);
@@ -55,7 +129,7 @@ function OverviewTab({ user, workingCenter }) {
     Promise.all([
       getPDCACycles().catch(()=>({cycles:[]})),
       getCapstoneSubmissions().catch(()=>({submissions:[]})),
-      getMenteeObservations().catch(()=>({observations:[]}))
+      getTeacherObservations().catch(()=>({observations:[]}))
     ]).then(([pdcaRes, capRes, obsRes]) => {
       const pdcas = pdcaRes.cycles || [];
       const caps = capRes.submissions || [];
@@ -85,147 +159,211 @@ function OverviewTab({ user, workingCenter }) {
           type: "observation"
         }))
       ].sort((a, b) => b.date - a.date).slice(0, 10);
-      setRecentActivities(merged);
+      
+      const activityMap = merged.map(item => {
+        if (item.type === "pdca") return { icon: "🔄", text: item.title, time: item.date.toLocaleDateString(), color: "#3b82f6" };
+        if (item.type === "capstone") return { icon: "🎓", text: item.title, time: item.date.toLocaleDateString(), color: "#10b981" };
+        return { icon: "👁️", text: item.title, time: item.date.toLocaleDateString(), color: "#8b5cf6" };
+      });
+      setRecentActivities(activityMap);
     });
   }, []);
 
-  const photoUrl = getMentorPhotoUrl(user);
-  const semester = user?.mentorProfile?.fellowshipSemester || 3;
   const mentees = user?.mentorProfile?.assignedTeachers || [];
-  const centerName = workingCenter
-    ? [workingCenter.name, workingCenter.city].filter(Boolean).join(", ")
-    : "Center not assigned";
-
-  const approvedFellowsCount = mentees.length; // all assigned mentees are approved fellows for this mentor
+  const monthlyReg = useMemo(() => buildMonthlyRegistrations(mentees), [mentees]);
   
-  let impactScoreRaw = (pdcaCount * 10) + (observationsCount * 5) + (capstoneSubmissionsCount * 15) + (approvedFellowsCount * 8);
-  const impactScore = Math.min(impactScoreRaw, 100);
+  const pendingMentees = mentees.filter(t => t.teacherProfile?.communityProfilingStatus === "pending" || t.teacherProfile?.communityImmersionStatus === "pending");
+  const addedThisMonth = monthlyReg.length > 0 ? monthlyReg[monthlyReg.length - 1].val : 0;
   
-  const totalMilestones = 4;
-  const capstoneProgress = Math.round((Math.min(capstoneSubmissionsCount, 4)) / totalMilestones * 100);
+  const totalCoursesAssigned = mentees.reduce((acc, t) => acc + (t.teacherProfile?.coursesAssigned || 1), 0);
+  const totalCoursesCompleted = mentees.reduce((acc, t) => acc + (t.teacherProfile?.coursesCompleted || 0), 0);
+  const courseCompletionPercent = totalCoursesAssigned > 0 ? Math.round((totalCoursesCompleted / totalCoursesAssigned) * 100) : 0;
+  
+  const pendingActivities = pdcaCount + capstoneSubmissionsCount; // Example stat
 
   return (
     <div style={{ animation: "fadeIn 0.3s ease" }}>
-      <div style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", borderRadius: 20, padding: "24px 28px", marginBottom: 24, color: "white", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 900, margin: "0 0 6px", letterSpacing: "-0.3px" }}>Good morning, {user.name?.split(" ")[0] || "Mentor"}!</h1>
-          <p style={{ fontSize: 13, margin: 0, opacity: 0.88 }}>UMANG Fellowship - Semester {semester} - {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long"})}</p>
-        </div>
-        <div style={{ position: "relative", flexShrink: 0 }}>
-          <div style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", border: "3px solid rgba(255,255,255,0.3)", background: "#f59e0b", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {photoUrl ? (
-              <img src={photoUrl} alt={user.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { e.target.style.display = "none"; }} />
-            ) : (
-              <span style={{ fontSize: 22, fontWeight: 800, color: "white" }}>{user.name?.[0] || "?"}</span>
-            )}
+      {/* Hero Header */}
+      <div style={{ background: "linear-gradient(135deg,#f59e0b 0%,#d97706 60%,#b45309 100%)", borderRadius: 20, padding: "28px 32px", marginBottom: 24, color: "white", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -30, right: -30, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }} />
+        <div style={{ position: "absolute", bottom: -20, right: 80, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#fffbeb", letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 8 }}>
+                SpacECE Mentor Panel
+              </div>
+              <h1 style={{ fontSize: 26, fontWeight: 900, margin: "0 0 6px", letterSpacing: "-0.5px" }}>
+                Good morning, {user.name?.split(" ")[0] || "Mentor"}! ☀️
+              </h1>
+              <p style={{ fontSize: 13, margin: 0, color: "rgba(255,255,255,0.85)" }}>
+                {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 12, flexShrink: 0 }}>
+              {pendingMentees.length > 0 && (
+                <div style={{ background: "rgba(239,68,68,0.25)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12, padding: "10px 16px", textAlign: "center" }}>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: "#fee2e2" }}>{pendingMentees.length}</div>
+                  <div style={{ fontSize: 10, color: "#fee2e2", fontWeight: 700 }}>Pending Review</div>
+                </div>
+              )}
+              <div style={{ background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 12, padding: "10px 16px", textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color: "white" }}>{mentees.length}</div>
+                <div style={{ fontSize: 10, color: "white", fontWeight: 700 }}>Active Teachers</div>
+              </div>
+            </div>
           </div>
-          {photoUrl && <span style={{ position: "absolute", bottom: 0, right: 0, background: "#10b981", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, border: "2px solid white" }}>📷</span>}
+
+          {/* Quick Stats Strip */}
+          <div style={{ display: "flex", gap: 20, marginTop: 20, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.1)", flexWrap: "wrap" }}>
+            {[
+              { label: "Centers",          val: workingCenter ? 1 : 0, icon: "🏫" },
+              { label: "Children",         val: mentees.length * 15, icon: "👶" }, // mock
+              { label: "Course Completion",val: `${courseCompletionPercent}%`, icon: "📚" },
+              { label: "PDCA Completed",   val: pdcaCount,       icon: "🔄" },
+              { label: "Pending Reviews",  val: pendingMentees.length, icon: "⏳" },
+            ].map((item, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 16 }}>{item.icon}</span>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "white", lineHeight: 1 }}>{item.val}</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>{item.label}</div>
+                </div>
+                {i < 4 && <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.1)", marginLeft: 12 }} />}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700 }}>
-        <span style={{ fontSize: 18 }}>@</span>
-        <span>Working Center: {centerName}</span>
+      {/* KPI Cards Row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(175px,1fr))", gap: 16, marginBottom: 24 }}>
+        {[
+          { icon: "🏫", label: "Total Centers",     val: workingCenter ? 1 : 0, color: "#f59e0b", bg: "#fef3c7", sub: workingCenter?.name || "None" },
+          { icon: "👩‍🏫", label: "Total Teachers",   val: mentees.length, color: "#10b981", bg: "#d1fae5", sub: `+${addedThisMonth} this month` },
+          { icon: "⏳", label: "Pending Reviews", val: pendingMentees.length, color: "#ef4444", bg: "#fee2e2", sub: pendingMentees.length > 0 ? "Need attention" : "All clear ✨" },
+          { icon: "👶", label: "Total Children",    val: mentees.length * 15, color: "#3b82f6", bg: "#dbeafe", sub: "Active enrollments" },
+          { icon: "📚", label: "Course Completion", val: `${courseCompletionPercent}%`, color: "#06b6d4", bg: "#cffafe", sub: "Assigned vs done" },
+          { icon: "🔄", label: "PDCA Cycles",val: pdcaCount, color: "#8b5cf6", bg: "#ede9fe", sub: "Completed" },
+        ].map((s, i) => (
+          <div key={i} style={{ background: "white", borderRadius: 16, padding: "18px 20px", border: "1px solid #f1f5f9", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", borderTop: `3px solid ${s.color}` }}>
+            <div style={{ width: 42, height: 42, borderRadius: 11, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, marginBottom: 12 }}>{s.icon}</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: "#1c1917", letterSpacing: "-1px", lineHeight: 1 }}>{s.val}</div>
+            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 500, marginTop: 3 }}>{s.label}</div>
+            {s.sub && <div style={{ fontSize: 11, color: s.color, fontWeight: 600, marginTop: 4 }}>{s.sub}</div>}
+          </div>
+        ))}
       </div>
 
-      {/* ── My Assigned Mentees Section ── */}
-      <div style={{ marginBottom: 20, marginTop: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1917", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 18 }}>👥</span> My Assigned Mentees
-        </div>
-        
-        {mentees.length > 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {/* start dnyaneshwari thorat */}
-            {mentees.map((mentee, i) => (
-              <div key={mentee?._id || mentee?.id || i} style={{
-                background: "white", borderRadius: 14, padding: "16px",
-                border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                borderLeft: "4px solid #f59e0b"
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 10,
-                    background: "linear-gradient(135deg,#fef3c7,#fbbf24)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 18, flexShrink: 0
-                  }}>👩‍🏫</div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#1c1917" }}>{mentee?.name || "Unknown Teacher"}</div>
-                    {mentee?.teacherProfile?.subject && <div style={{ fontSize: 11, color: "#6b7280" }}>{mentee.teacherProfile.subject}</div>}
+      {/* Main Content Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 20, marginBottom: 20 }}>
+        {/* Teacher Registration Chart */}
+        <SectionCard title="📊 Assigned Teacher Trend — Last 6 Months">
+          {mentees.length === 0 ? (
+            <div style={{ color: "#9ca3af", fontSize: 13, padding: "20px 0", textAlign: "center" }}>No teacher records yet.</div>
+          ) : (
+            <>
+              <BarChart data={monthlyReg} color="#f59e0b" height={150} />
+              <div style={{ display: "flex", gap: 12, marginTop: 16, paddingTop: 14, borderTop: "1px solid #f3f4f6" }}>
+                {[
+                  { label: "Total",    val: mentees.length,          color: "#374151" },
+                  { label: "Active", val: mentees.length,  color: "#10b981" },
+                  { label: "Pending Review",  val: pendingMentees.length,   color: "#f59e0b" }
+                ].map((s, i) => (
+                  <div key={i} style={{ flex: 1, textAlign: "center", padding: "8px", background: "#f9fafb", borderRadius: 8 }}>
+                    <div style={{ fontSize: 18, fontWeight: 900, color: s.color }}>{s.val}</div>
+                    <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>{s.label}</div>
                   </div>
+                ))}
+              </div>
+            </>
+          )}
+        </SectionCard>
+
+        {/* Operational Summary */}
+        <SectionCard title="🚀 Mentorship Summary">
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {[
+              { label: "Teacher PDCA Tasks",  val: pdcaCount, max: Math.max(pdcaCount + pendingActivities, 1),  color: "#10b981" },
+              { label: "Course Completion Rate",    val: courseCompletionPercent,       max: 100, color: "#3b82f6" },
+              { label: "Capstone Progress",           val: capstoneSubmissionsCount,       max: 4, color: "#f59e0b" },
+              { label: "Pending Reviews",   val: pendingMentees.length,       max: mentees.length || 1,                        color: "#8b5cf6" },
+            ].map((item, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <DonutChart value={item.val} max={item.max} color={item.color} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1c1917" }}>{item.label}</div>
+                  <div style={{ fontSize: 12, color: item.color, fontWeight: 800, marginTop: 2 }}>{item.val} / {item.max}</div>
                 </div>
               </div>
             ))}
-            {/* end dnyaneshwari thorat */}
           </div>
-        ) : (
-          <div style={{
-            background: "white", borderRadius: 14, padding: "24px",
-            border: "1px solid #e5e7eb", textAlign: "center"
-          }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#6b7280" }}>No mentees assigned yet</div>
-            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Contact admin to assign teachers to you</div>
-          </div>
-        )}
+        </SectionCard>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 16, marginBottom: 24, marginTop: 16 }}>
-        <StatCard icon="👥" label="Assigned Mentees" val={mentees.length || "0"} color="#3b82f6" bg="#dbeafe"/>
-        <StatCard icon="📈" label="Impact Score" val={impactScore} color="#10b981" bg="#d1fae5"/>
-        <StatCard icon="📝" label="Observations" val={observationsCount} color="#8b5cf6" bg="#ede9fe"/>
-        <StatCard icon="🏆" label="Capstone Progress" val={`${capstoneProgress}%`} color="#06b6d4" bg="#cffafe"/>
+      {/* Bottom Row */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
+        {/* Top Teachers Leaderboard */}
+        <SectionCard title="🏆 Top Performing Teachers">
+          {mentees.length === 0 ? (
+            <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "20px 0" }}>No approved teachers yet.</div>
+          ) : [...mentees].map(t => ({...t, dynamicScore: getTeacherScore(t)})).sort((a,b)=> b.dynamicScore - a.dynamicScore).slice(0,5).map((t, i) => {
+            const score = t.dynamicScore;
+            const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
+            return (
+              <div key={t._id || `teacher-${i}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid #f3f4f6" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{medals[i]}</span>
+                  {getInitialsAvatar(t.name, i)}
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1917", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
+                    <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>{t.teacherProfile?.center?.name || "Spacece Mumbai Center"}</div>
+                    <div style={{ height: 4, background: "#f3f4f6", borderRadius: 4, overflow: "hidden", width: 140 }}>
+                      <div style={{ height: "100%", width: `${score}%`, background: score > 0 ? "#10b981" : "#f59e0b", borderRadius: 4, transition: "width 0.8s" }} />
+                    </div>
+                  </div>
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 900, color: score > 0 ? "#10b981" : "#f59e0b", flexShrink: 0 }}>{score}%</span>
+              </div>
+            );
+          })}
+        </SectionCard>
+
+        {/* Working Center */}
+        <SectionCard title="🏫 Working Center">
+          {!workingCenter ? (
+            <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "20px 0" }}>No center assigned.</div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #f3f4f6" }}>
+              <div style={{ width: 34, height: 34, borderRadius: 10,
+                background: "linear-gradient(135deg,#fef3c7,#fbbf24)",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🏫</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#1c1917", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{workingCenter.name}</div>
+                <div style={{ fontSize: 10, color: "#9ca3af" }}>{workingCenter.city || "--"}</div>
+              </div>
+              <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700,
+                background: "#d1fae5", color: "#065f46", flexShrink: 0 }}>
+                Active
+              </span>
+            </div>
+          )}
+        </SectionCard>
+
+        {/* Recent Activity */}
+        <SectionCard title="⚡ Recent Activity">
+          {recentActivities.length === 0 ? (
+            <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "20px 0" }}>No recent activity.</div>
+          ) : recentActivities.map((a, i) => (
+            <ActivityItem key={i} {...a} />
+          ))}
+        </SectionCard>
       </div>
-      
-      <SectionCard title="Recent Activity" icon="🕒">
-         {recentActivities.length > 0 ? (
-           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-             {recentActivities.map((act) => (
-               <div key={act.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
-                 <div style={{ width: 32, height: 32, borderRadius: "50%", background: "white", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-                   {act.type === "pdca" ? "📝" : act.type === "capstone" ? "🏆" : "👀"}
-                 </div>
-                 <div style={{ flex: 1 }}>
-                   <div style={{ fontSize: 14, fontWeight: 600, color: "#1e293b" }}>{act.title}</div>
-                   <div style={{ fontSize: 11, color: "#64748b" }}>{act.date.toLocaleString()}</div>
-                 </div>
-               </div>
-             ))}
-           </div>
-         ) : (
-           <div style={{ textAlign: "center", padding: 20, color: "#9ca3af", fontSize: 12 }}>
-             No recent activity.
-           </div>
-         )}
-      </SectionCard>
     </div>
   );
 }
 
-/* ── Sidebar Avatar Component ── */
-function SidebarAvatar({ user, size = 34 }) {
-  const [imgError, setImgError] = useState(false);
-  const photoUrl = getMentorPhotoUrl(user);
-  
-  if (!photoUrl || imgError) {
-    return (
-      <div style={{ width: size, height: size, borderRadius: "50%", background: "linear-gradient(135deg,#3b82f6,#1d4ed8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: "white", flexShrink: 0 }}>
-        {user?.name?.[0] || "?"}
-      </div>
-    );
-  }
-  
-  return (
-    <div style={{ position: "relative", flexShrink: 0 }}>
-      <img src={photoUrl} alt={user?.name} onError={() => setImgError(true)}
-        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "2px solid #e2e8f0" }} />
-      <span style={{ position: "absolute", bottom: 0, right: 0, background: "#10b981", borderRadius: "50%", width: 12, height: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, border: "1.5px solid white" }}>📷</span>
-    </div>
-  );
-}
 
-/* ── Main MentorDashboard Export ── */
 export default function MentorDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -306,9 +444,9 @@ export default function MentorDashboard({ user, onLogout }) {
   const navItems = [
     { key: "overview", label: "Overview", icon: "📊" },
     { key: "my_attendance", label: "My Attendance", icon: "📍" },
-    { key: "mentees", label: "Mentee Management", icon: "👥" },
-    { key: "fellow_attendance", label: "Fellow Attendance", icon: "📅" },
-    { key: "activities", label: "Fellow Activities", icon: "📝" },
+    { key: "attendance", label: "Teacher Attendance", icon: "👥" },
+    { key: "teachers", label: "Teacher Management", icon: "👩‍🏫" },
+    { key: "activities", label: "Teacher Activities", icon: "🎯" },
     { key: "curriculum", label: "Curriculum Management", icon: "📚" },
     { key: "impact", label: "Impact & Capstone", icon: "🏆" },
     { key: "documentation", label: "Documentation (PDCA)", icon: "📝" },
@@ -319,10 +457,14 @@ export default function MentorDashboard({ user, onLogout }) {
     switch(activeTab) {
       case "overview": return <OverviewTab user={currentUser} workingCenter={workingCenter} />;
       case "my_attendance": return <MentorAttendanceTab user={currentUser} setToast={setToast} />;
-      case "mentees": return <MenteeManagementTab user={currentUser} setToast={setToast} onUserUpdate={setCurrentUser} />;
-      case "fellow_attendance": return <MentorFellowAttendanceTab user={currentUser} setToast={setToast} />;
-      case "activities": return <MentorActivitiesTab user={currentUser} setToast={setToast} />;
-      case "curriculum": return <MentorCurriculumTab user={currentUser} setToast={setToast} />;
+      case "attendance": return <AttendanceTab teachers={currentUser?.mentorProfile?.assignedTeachers || []} sessions={[]} isMentorView={true} />;
+      case "teachers": return <TeacherManagementTab setToast={setToast} onTeacherAssigned={() => {
+        getMentorMe().then(res => {
+          if (res.mentor) setCurrentUser(res.mentor);
+        }).catch(err => console.error(err));
+      }} />;
+      case "activities": return <TeacherActivitiesTab user={currentUser} setToast={setToast} />;
+      case "curriculum": return <TeacherCurriculumTab user={currentUser} setToast={setToast} />;
       case "impact": return <ImpactCapstoneTab user={currentUser} setToast={setToast} onUserUpdate={setCurrentUser} />;
       case "documentation": return <PDCATab user={currentUser} setToast={setToast} onUserUpdate={setCurrentUser} />;
       case "notifications": return <MentorNotificationsTab notifications={notifications} onMarkRead={handleMarkNotifRead} onMarkAllRead={handleMarkAllNotifRead} />;
@@ -359,7 +501,9 @@ export default function MentorDashboard({ user, onLogout }) {
           padding: "12px 16px", borderTop: "1px solid #f1f5f9", 
           display: "flex", alignItems: "center", gap: 10, background: "white", zIndex: 50
         }}>
-          <SidebarAvatar user={currentUser} size={34} />
+          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#f59e0b", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, flexShrink: 0 }}>
+            {(currentUser.name || "M").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()}
+          </div>
           <div style={{ flex: 1, overflow: "hidden" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#1c1917" }}>{currentUser.name?.split(" ")[0]}</div>
             <div style={{ fontSize: 10, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Mentor</div>
@@ -373,7 +517,7 @@ export default function MentorDashboard({ user, onLogout }) {
             }}
             onMouseEnter={(e)=>e.currentTarget.style.background="#fee2e2"}
             onMouseLeave={(e)=>e.currentTarget.style.background="transparent"}
-          >⏻</button>
+          >🚪</button>
         </div>
       </div>
 
@@ -401,7 +545,7 @@ export default function MentorDashboard({ user, onLogout }) {
               </span>
             )}
             <div style={{ fontSize: 14, fontWeight: 700, color: "#92400e" }}>{currentUser.name?.split(" ")[0] || "Mentor"}</div>
-            <div style={{ fontSize: 18, fontWeight: 700, paddingBottom: 6, color: "#92400e" }}>⋮</div>
+            <div style={{ fontSize: 18, fontWeight: 700, paddingBottom: 6, color: "#92400e" }}>🔽</div>
           </div>
           
           {menuOpen && (

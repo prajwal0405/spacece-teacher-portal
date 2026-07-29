@@ -714,6 +714,11 @@ export function getTeacherAttendance(params = {}) {
   return request(`/api/attendance/teachers?${searchParams.toString()}`);
 }
 
+export function getMentorAttendanceByAdmin(params = {}) {
+  const searchParams = new URLSearchParams(params);
+  return request(`/api/attendance/mentors?${searchParams.toString()}`);
+}
+
 export function saveTeacherAttendance(payload) {
   return request("/api/attendance/teachers", {
     method: "POST",
@@ -1307,7 +1312,7 @@ export function changeMentorPassword(currentPassword, newPassword) {
 
 // ── Mentor Tabs APIs ──
 // ── Mentor Tracking APIs ──
-export function getMenteeObservations() {
+export function getTeacherObservations() {
   return request("/api/mentor/tracking/observations");
 }
 
@@ -1390,3 +1395,10 @@ export const uploadCurriculumBulk = (formData) => request('/api/mentor/tracking/
 export const addCurriculumTopic = (data) => request('/api/mentor/tracking/curriculum/add-topic', { method: 'POST', body: JSON.stringify(data) });
 export const deleteCurriculumTopic = (planId, phaseId, topicId) => request(`/api/mentor/tracking/curriculum/topic/${planId}/${phaseId}/${topicId}`, { method: 'DELETE' });
 export const publishCurriculumPlan = (planId) => request(`/api/mentor/tracking/curriculum/publish/${planId}`, { method: 'POST' });
+
+export const getMentorTeachers = getMentorFellows;
+export const claimTeacher = claimFellow;
+export const unclaimTeacher = unclaimFellow;
+export const deleteMentorTeacher = deleteMentorFellow;
+export const getMentorAssignedTeachers = getMentorAssignedMentees;
+export const recordTeacherObservation = recordMenteeObservation;

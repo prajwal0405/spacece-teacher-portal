@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { isValidPhoneNumber } from "libphonenumber-js";
 // End: Dnyaneshwari Thorat
 import { Logo, Toast, Particles, S, globalCSS } from "../components/Shared";
+import schoolsConfig from "../data/schoolsConfig.json";
 // Start: Dnyaneshwari Thorat
 import { loginUser, registerTeacher, registerMentor, requestPasswordReset, resetPassword, verifyPasswordResetToken, requestPasswordResetOtp, verifyPasswordOtp, sendSignupOtp, verifySignupOtp } from "../services/api";
 // End: Dnyaneshwari Thorat
@@ -589,7 +590,7 @@ function ResetPasswordForm({ token, onDone }) {
 /* ── Register Form ── */
 // Start: Dnyaneshwari Thorat
 function RegisterForm({ onBack }) {
-  const [role, setRole]         = useState("teacher"); // teacher | mentor | fellow
+  const [role, setRole]         = useState("teacher"); // teacher | mentor
   const [form, setForm]         = useState({ name: "", email: "", phone: "", address: "", subject: "", photo: "", password: "", confirmPassword: "" });
   const [showPass, setShowPass] = useState(false);
   const [toast, setToast]       = useState({ msg: "", type: "" });
@@ -611,8 +612,21 @@ function RegisterForm({ onBack }) {
   const handleRegisterClick = (e) => {
     e.preventDefault();
     const { name, email, phone, address, subject, password, confirmPassword } = form;
-    if (!name || !email || !phone || !address || !subject || !password || !confirmPassword) {
+    
+    if (!name.trim() || !email.trim() || !phone.trim() || !address || !subject.trim() || !password || !confirmPassword) {
       setToast({ msg: "Please fill all required fields.", type: "error" });
+      return;
+    }
+
+    const nameRegex = /^[a-zA-Z\s]{4,}$/;
+    if (!nameRegex.test(name.trim())) {
+      setToast({ msg: "Name must be at least 4 characters long and contain only letters and spaces.", type: "error" });
+      return;
+    }
+
+    const specRegex = /^[a-zA-Z\s0-9.,&-]{3,}$/;
+    if (!specRegex.test(subject.trim())) {
+      setToast({ msg: "Please enter a valid specialization (at least 3 characters).", type: "error" });
       return;
     }
 
@@ -684,19 +698,16 @@ function RegisterForm({ onBack }) {
             phone: phone.trim(),
             password,
             qualification: "Graduate",
-            specialization: subject,
+            specialization: subject, subject: subject,
             experience: "2 years",
             address,
-            fellowshipSemester: role === "fellow" ? 1 : undefined,
             role,
             photoUrl: photo,
           });
         }
       })
       .then(() => {
-        const successMsg = role === "fellow"
-          ? "Registration successful! You can sign in now."
-          : "Registration submitted! Awaiting admin approval.";
+        const successMsg = "Registration submitted! Awaiting admin approval.";
         setToast({ msg: successMsg, type: "success" });
         setTimeout(onBack, 2000);
       })
@@ -706,7 +717,7 @@ function RegisterForm({ onBack }) {
       .finally(() => setVerifying(false));
   };
 
-  const roleLabel = role === "teacher" ? "Teacher" : role === "mentor" ? "Mentor" : "Fellow";
+  const roleLabel = role === "teacher" ? "Teacher" : "Mentor";
 
   if (step === "otp") {
     return (
@@ -763,7 +774,6 @@ function RegisterForm({ onBack }) {
         >
           <option value="teacher">Teacher</option>
           <option value="mentor">Mentor</option>
-          <option value="fellow">Fellow</option>
         </select>
       </div>
 
@@ -773,14 +783,14 @@ function RegisterForm({ onBack }) {
             <label style={ci.label}>Full Name</label>
             <div style={{ position: "relative" }}>
               <span style={ci.fieldIcon}>👤</span>
-              <input style={{ ...S.input, ...ci.input }} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Dr. Jane Smith" />
+              <input style={{ ...S.input, ...ci.input }} required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Dr. Jane Smith" />
             </div>
           </div>
           <div style={{ flex: 1, ...ci.mb }}>
-            <label style={ci.label}>{role === "teacher" ? "Subject" : "Specialization"}</label>
+            <label style={ci.label}>Specialization *</label>
             <div style={{ position: "relative" }}>
               <span style={ci.fieldIcon}>📘</span>
-              <input style={{ ...S.input, ...ci.input }} value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder={role === "teacher" ? "Mathematics" : "Early Childhood"} />
+              <input style={{ ...S.input, ...ci.input }} required value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder="e.g. Mathematics, Early Childhood" />
             </div>
           </div>
         </div>
@@ -799,6 +809,8 @@ function RegisterForm({ onBack }) {
                   borderColor: f.key === "email" && form.email && !/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.email) ? "#ef4444" : "#e5e7eb",
                 }}
                 type={f.type}
+                required
+                pattern={f.key === "phone" ? "^[6-9]\\d{9}$" : undefined}
                 value={form[f.key]}
                 onChange={e => setForm({ ...form, [f.key]: e.target.value })}
                 placeholder={f.ph}
@@ -825,15 +837,35 @@ function RegisterForm({ onBack }) {
           </div>
         </div>
         <div style={ci.mb}>
-          <label style={ci.label}>School / Address</label>
-          <textarea style={{ ...S.input, height: 48, resize: "none", fontSize: 12, padding: "7px 10px" }}
-            value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="School name and location" />
+          <label style={ci.label}>School / Centre *</label>
+          <div style={{ position: "relative" }}>
+            <span style={ci.fieldIcon}>🏫</span>
+            <select
+              style={{ ...S.input, ...ci.input, cursor: "pointer", appearance: "none" }}
+              required
+              value={form.address}
+              onChange={e => setForm({ ...form, address: e.target.value })}
+            >
+              <option value="" disabled>Select School/Centre</option>
+              <optgroup label="Centres">
+                {schoolsConfig.centers.map((c) => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Maval Cluster Schools">
+                {schoolsConfig.mavalSchools.map((s) => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </optgroup>
+            </select>
+            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 10 }}>▼</span>
+          </div>
         </div>
         <div style={ci.mb}>
-          <label style={ci.label}>Password</label>
+          <label style={ci.label}>Password *</label>
           <div style={{ position: "relative" }}>
             <span style={ci.fieldIcon}>🔒</span>
-            <input style={{ ...S.input, ...ci.input }} type={showPass ? "text" : "password"} value={form.password}
+            <input style={{ ...S.input, ...ci.input }} required minLength={8} type={showPass ? "text" : "password"} value={form.password}
               onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Min. 8 characters" />
             <button type="button" onClick={() => setShowPass(!showPass)}
               style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>
@@ -843,10 +875,10 @@ function RegisterForm({ onBack }) {
           <StrengthBar password={form.password} />
         </div>
         <div style={ci.mb}>
-          <label style={ci.label}>Confirm Password</label>
+          <label style={ci.label}>Confirm Password *</label>
           <div style={{ position: "relative" }}>
             <span style={ci.fieldIcon}>🛡️</span>
-            <input style={{ ...S.input, ...ci.input }} type="password" value={form.confirmPassword}
+            <input style={{ ...S.input, ...ci.input }} required minLength={8} type="password" value={form.confirmPassword}
               onChange={e => setForm({ ...form, confirmPassword: e.target.value })} placeholder="Re-enter password" />
           </div>
         </div>

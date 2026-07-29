@@ -1202,7 +1202,7 @@ app.get("/api/admin/dashboard", requireAuth, requireRole("admin"), async (_req, 
   }
 });
 
-app.get("/api/centers", requireAuth, requireRole("admin"), async (_req, res, next) => {
+app.get("/api/centers", requireAuth, requireRole("admin", "mentor"), async (_req, res, next) => {
   try {
     const rawCenters = await Center.find().sort({ createdAt: -1 }).populate("mentor", "name email phone photoUrl");
     const centers = await Promise.all(rawCenters.map(async (center) => {
@@ -1350,7 +1350,7 @@ app.post("/api/centers", requireAuth, requireRole("admin"), async (req, res, nex
   }
 });
 
-app.get("/api/admin/teachers", requireAuth, requireRole("admin"), async (_req, res, next) => {
+app.get("/api/admin/teachers", requireAuth, requireRole("admin", "mentor"), async (_req, res, next) => {
   try {
     const teachers = await User.find({ role: "teacher" })
       .select("-passwordHash")
@@ -1364,7 +1364,7 @@ app.get("/api/admin/teachers", requireAuth, requireRole("admin"), async (_req, r
   }
 });
 
-app.patch("/api/admin/teachers/:id/status", requireAuth, requireRole("admin"), async (req, res, next) => {
+app.patch("/api/admin/teachers/:id/status", requireAuth, requireRole("admin", "mentor"), async (req, res, next) => {
   try {
     const teacher = await User.findOneAndUpdate(
       { _id: req.params.id, role: "teacher" },
@@ -1728,8 +1728,11 @@ app.get("/api/mentor/me", requireAuth, requireRole("mentor"), async (req, res, n
       .populate("mentorProfile.center", "name address city")
       .populate("mentorProfile.classes", "name")
       // start dnyaneshwari thorat
-      .populate("mentorProfile.assignedTeachers", "name email phone role teacherProfile.subject photoUrl teacherProfile.communityProfilingStatus teacherProfile.communityImmersionStatus teacherProfile.curriculumImplementationStatus");
-      // end dnyaneshwari thorat
+      .populate({
+        path: "mentorProfile.assignedTeachers",
+        select: "name email phone role photoUrl createdAt teacherProfile",
+        populate: { path: "teacherProfile.center", select: "name city" }
+      });
     res.json({ mentor });
   } catch (error) {
     res.status(500).json({ message: error.message, stack: error.stack });
@@ -1840,7 +1843,7 @@ app.post("/api/mentor/change-password", requireAuth, requireRole("mentor"), asyn
 app.get("/api/mentor/fellows", requireAuth, requireRole("mentor"), async (req, res, next) => {
   try {
     const fellows = await User.find({ 
-      role: "fellow",
+      role: { "$in": ["fellow", "teacher"] },
       $or: [
         { assignedMentor: { $exists: false } },
         { assignedMentor: null },
@@ -1860,7 +1863,7 @@ app.get("/api/mentor/fellows", requireAuth, requireRole("mentor"), async (req, r
 app.get("/api/mentor/fellows/attendance", requireAuth, requireRole("mentor"), async (req, res, next) => {
   try {
     const { from, to } = req.query;
-    const fellows = await User.find({ role: "fellow", assignedMentor: req.user.id }).select("_id");
+    const fellows = await User.find({ role: { "$in": ["fellow", "teacher"] }, assignedMentor: req.user.id }).select("_id");
     const fellowIds = fellows.map(f => f._id);
     
     let dateFilter = {};
@@ -1889,7 +1892,7 @@ app.patch("/api/mentor/fellows/:id/status", requireAuth, requireRole("mentor"), 
     }
 
     const fellow = await User.findOneAndUpdate(
-      { _id: req.params.id, role: "fellow" },
+      { _id: req.params.id, role: { "$in": ["fellow", "teacher"] } },
       { status },
       { new: true }
     ).select("-passwordHash");
@@ -1940,7 +1943,7 @@ app.patch("/api/mentor/fellows/:id/status", requireAuth, requireRole("mentor"), 
 // start dnyaneshwari thorat
 app.delete("/api/mentor/fellows/:id", requireAuth, requireRole("mentor"), async (req, res, next) => {
   try {
-    const fellow = await User.findOneAndDelete({ _id: req.params.id, role: "fellow" });
+    const fellow = await User.findOneAndDelete({ _id: req.params.id, role: { "$in": ["fellow", "teacher"] } });
     if (!fellow) return res.status(404).json({ message: "Fellow not found" });
     
     // Remove fellow from any mentor's assignedTeachers list
@@ -1974,7 +1977,7 @@ app.post("/api/mentor/fellows/:id/claim", requireAuth, requireRole("mentor"), as
     const updatedFellow = await User.findOneAndUpdate(
       { 
         _id: fellowId, 
-        role: "fellow",
+        role: { "$in": ["fellow", "teacher"] },
         $or: [
           { assignedMentor: { $exists: false } },
           { assignedMentor: null }
@@ -1986,7 +1989,7 @@ app.post("/api/mentor/fellows/:id/claim", requireAuth, requireRole("mentor"), as
 
     if (!updatedFellow) {
       // It means the fellow doesn't exist OR was already claimed by someone else
-      const existingFellow = await User.findOne({ _id: fellowId, role: "fellow" });
+      const existingFellow = await User.findOne({ _id: fellowId, role: { "$in": ["fellow", "teacher"] } });
       if (!existingFellow) {
         return res.status(404).json({ message: "Fellow not found." });
       } else {
@@ -2019,7 +2022,7 @@ app.post("/api/mentor/fellows/:id/claim", requireAuth, requireRole("mentor"), as
 app.post("/api/mentor/fellows/:id/unclaim", requireAuth, requireRole("mentor"), async (req, res, next) => {
   try {
     const fellowId = req.params.id;
-    const fellow = await User.findOne({ _id: fellowId, role: "fellow" });
+    const fellow = await User.findOne({ _id: fellowId, role: { "$in": ["fellow", "teacher"] } });
     if (!fellow) {
       return res.status(404).json({ message: "Fellow not found." });
     }
@@ -2280,7 +2283,7 @@ app.get("/api/teacher/children", requireAuth, requireRole("teacher", "fellow"), 
     if (req.user.role === "fellow") {
       filter.createdBy = req.user.id;
     } else if (req.user.role === "teacher") {
-      const fellowUsers = await User.find({ role: "fellow" }).select("_id");
+      const fellowUsers = await User.find({ role: { "$in": ["fellow", "teacher"] } }).select("_id");
       filter.createdBy = { $nin: fellowUsers.map(u => u._id) };
     }
 
@@ -3131,7 +3134,7 @@ async function logClassAction(action, classId, className, centerId, performedBy,
   }
 }
 
-app.get("/api/admin/classes", requireAuth, requireRole("admin"), async (req, res, next) => {
+app.get("/api/admin/classes", requireAuth, requireRole("admin", "mentor"), async (req, res, next) => {
   try {
     const centerId = objectIdFilter(req.query.centerId, "centerId");
     const filter = centerId ? { center: centerId } : {};
@@ -3240,7 +3243,7 @@ app.delete("/api/admin/children/:id", requireAuth, requireRole("admin"), async (
 // ==========================================
 // TEACHER MANAGEMENT
 // ==========================================
-app.patch("/api/admin/teachers/:id", requireAuth, requireRole("admin"), async (req, res, next) => {
+app.patch("/api/admin/teachers/:id", requireAuth, requireRole("admin", "mentor"), async (req, res, next) => {
   try {
     const { name, phone, email, teacherProfile } = req.body;
     const updateData = {};
@@ -3266,7 +3269,7 @@ app.patch("/api/admin/teachers/:id", requireAuth, requireRole("admin"), async (r
   }
 });
 
-app.delete("/api/admin/teachers/:id", requireAuth, requireRole("admin"), async (req, res, next) => {
+app.delete("/api/admin/teachers/:id", requireAuth, requireRole("admin", "mentor"), async (req, res, next) => {
   try {
     await User.findByIdAndDelete(req.params.id);
     res.json({ success: true });
@@ -3275,7 +3278,7 @@ app.delete("/api/admin/teachers/:id", requireAuth, requireRole("admin"), async (
   }
 });
 
-app.patch("/api/admin/teachers/:id/block", requireAuth, requireRole("admin"), async (req, res, next) => {
+app.patch("/api/admin/teachers/:id/block", requireAuth, requireRole("admin", "mentor"), async (req, res, next) => {
   try {
     const teacher = await User.findOneAndUpdate(
       { _id: req.params.id, role: "teacher" },
@@ -3289,7 +3292,7 @@ app.patch("/api/admin/teachers/:id/block", requireAuth, requireRole("admin"), as
   }
 });
 
-app.patch("/api/admin/teachers/:id/unblock", requireAuth, requireRole("admin"), async (req, res, next) => {
+app.patch("/api/admin/teachers/:id/unblock", requireAuth, requireRole("admin", "mentor"), async (req, res, next) => {
   try {
     const teacher = await User.findOneAndUpdate(
       { _id: req.params.id, role: "teacher" },
@@ -4352,6 +4355,26 @@ app.get("/api/attendance/teachers", requireAuth, async (req, res, next) => {
   }
 });
 
+app.get("/api/attendance/mentors", requireAuth, requireRole("admin", "mentor"), async (req, res, next) => {
+  try {
+    const filter = {};
+    if (req.query.mentorId && req.query.mentorId !== "undefined") filter.mentor = req.query.mentorId;
+    if (req.query.date) {
+      const d = new Date(req.query.date);
+      filter.attendanceDate = {
+        $gte: new Date(d.setHours(0,0,0,0)),
+        $lte: new Date(d.setHours(23,59,59,999))
+      };
+    }
+    const records = await MentorAttendanceRecord.find(filter)
+      .populate("mentor", "name email center")
+      .sort({ attendanceDate: -1 });
+    res.json({ records });
+  } catch (error) {
+    res.status(500).json({ message: error.message, stack: error.stack });
+  }
+});
+
 app.post("/api/attendance/teachers", requireAuth, requireRole("teacher", "fellow"), async (req, res, next) => {
   try {
     const { status, source, latitude, longitude, note, attendanceDate } = req.body;
@@ -4728,7 +4751,7 @@ app.patch("/api/admin/report-jobs/:id", requireAuth, requireRole("admin"), async
 // ==========================================
 // ADMIN USERS
 // ==========================================
-app.get("/api/admin/users", requireAuth, requireRole("admin"), async (req, res, next) => {
+app.get("/api/admin/users", requireAuth, requireRole("admin", "mentor"), async (req, res, next) => {
   try {
     const filter = {};
     if (req.query.role) filter.role = req.query.role;

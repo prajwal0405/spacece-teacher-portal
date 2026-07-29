@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { getMentorCurriculum, uploadCurriculumBulk, addCurriculumTopic, deleteCurriculumTopic, publishCurriculumPlan } from '../services/api';
 
-function SearchableFellowSelect({ fellows, selectedFellow, onChange }) {
+function SearchableTeacherSelect({ Teachers, selectedTeacher, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef(null);
@@ -35,9 +35,9 @@ function SearchableFellowSelect({ fellows, selectedFellow, onChange }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredFellows = [
-    { _id: 'all', name: 'All Fellows (Bulk Assign)', subject: 'Broadcast to everyone' },
-    ...fellows.filter(f => (f.name || "").toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredTeachers = [
+    { _id: 'all', name: 'All Teachers (Bulk Assign)', subject: 'Broadcast to everyone' },
+    ...Teachers.filter(f => (f.name || "").toLowerCase().includes(searchTerm.toLowerCase()))
   ];
 
   return (
@@ -47,7 +47,7 @@ function SearchableFellowSelect({ fellows, selectedFellow, onChange }) {
         className="bg-slate-100 border border-slate-300 text-sm font-medium rounded-xl px-4 py-2.5 cursor-pointer flex justify-between items-center transition hover:bg-slate-200"
       >
         <span className="truncate text-slate-700">
-          {selectedFellow ? `Fellow: ${selectedFellow.name}` : "Select Fellow"}
+          {selectedTeacher ? `Teacher: ${selectedTeacher.name}` : "Select Teacher"}
         </span>
         <span className="text-slate-400 text-xs ml-2">▼</span>
       </div>
@@ -59,7 +59,7 @@ function SearchableFellowSelect({ fellows, selectedFellow, onChange }) {
               <Search className="w-4 h-4 text-slate-400 absolute left-2" />
               <input
                 type="text"
-                placeholder="Search fellow..."
+                placeholder="Search Teacher..."
                 className="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -68,18 +68,18 @@ function SearchableFellowSelect({ fellows, selectedFellow, onChange }) {
             </div>
           </div>
           <div className="overflow-y-auto">
-            {filteredFellows.length > 0 ? (
-              filteredFellows.map(fellow => (
+            {filteredTeachers.length > 0 ? (
+              filteredTeachers.map(Teacher => (
                 <div
-                  key={fellow._id || fellow.id || Math.random()}
+                  key={Teacher._id || Teacher.id || Math.random()}
                   className="px-4 py-2 text-sm hover:bg-amber-50 cursor-pointer text-slate-700 font-medium border-b border-slate-50 last:border-0"
-                  onClick={() => { onChange(fellow); setIsOpen(false); setSearchTerm(""); }}
+                  onClick={() => { onChange(Teacher); setIsOpen(false); setSearchTerm(""); }}
                 >
-                  {fellow.name || "Unknown Fellow"}
+                  {Teacher.name || "Unknown Teacher"}
                 </div>
               ))
             ) : (
-              <div className="px-4 py-4 text-sm text-slate-400 text-center">No fellows found</div>
+              <div className="px-4 py-4 text-sm text-slate-400 text-center">No Teachers found</div>
             )}
           </div>
         </div>
@@ -88,12 +88,12 @@ function SearchableFellowSelect({ fellows, selectedFellow, onChange }) {
   );
 }
 
-export default function MentorCurriculumTab({ user }) {
+export default function TeacherCurriculumTab({ user }) {
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [showAddTopicModal, setShowAddTopicModal] = useState(false);
   const [curriculumPlan, setCurriculumPlan] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedFellow, setSelectedFellow] = useState(null);
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [uploadFile, setUploadFile] = useState(null);
   const [newTopicPhase, setNewTopicPhase] = useState("");
   const [newTopicTitle, setNewTopicTitle] = useState("");
@@ -101,14 +101,14 @@ export default function MentorCurriculumTab({ user }) {
   const [splitType, setSplitType] = useState("4-semesters");
   const [expandedTopic, setExpandedTopic] = useState(null);
 
-  const assignedFellows = user?.mentorProfile?.assignedTeachers || [];
+  const assignedTeachers = user?.mentorProfile?.assignedTeachers || [];
 
   const toggleBulkModal = () => setShowBulkUploadModal(!showBulkUploadModal);
   const toggleAddModal = () => setShowAddTopicModal(!showAddTopicModal);
 
   useEffect(() => {
     fetchCurriculum();
-  }, [selectedFellow, assignedFellows.length]);
+  }, [selectedTeacher, assignedTeachers.length]);
 
   const fetchCurriculum = async () => {
     try {
@@ -116,18 +116,18 @@ export default function MentorCurriculumTab({ user }) {
       const data = await getMentorCurriculum();
       if (data && data.success && data.curriculum) {
         let activePlan = null;
-        if (selectedFellow) {
-          const fellowId = selectedFellow._id || selectedFellow.id;
-          activePlan = data.curriculum.find(p => p.assignedFellow === fellowId);
+        if (selectedTeacher) {
+          const TeacherId = selectedTeacher._id || selectedTeacher.id;
+          activePlan = data.curriculum.find(p => p.assignedTeacher === TeacherId);
         } else if (data.curriculum.length > 0) {
           activePlan = data.curriculum[0];
-          // Auto-select the fellow for this plan
-          const fellow = assignedFellows.find(f => (f._id || f.id) === activePlan.assignedFellow);
-          if (fellow) {
-             // We do not call setSelectedFellow here directly to avoid loops, 
-             // we just let the UI show the active plan if selectedFellow is null,
+          // Auto-select the Teacher for this plan
+          const Teacher = assignedTeachers.find(f => (f._id || f.id) === activePlan.assignedTeacher);
+          if (Teacher) {
+             // We do not call setSelectedTeacher here directly to avoid loops, 
+             // we just let the UI show the active plan if selectedTeacher is null,
              // or we set it if we want to force the top dropdown to match.
-             setTimeout(() => setSelectedFellow(fellow), 0);
+             setTimeout(() => setSelectedTeacher(Teacher), 0);
           }
         }
         setCurriculumPlan(activePlan || null);
@@ -146,14 +146,14 @@ export default function MentorCurriculumTab({ user }) {
       alert("Please select an Excel or CSV file first.");
       return;
     }
-    if (!selectedFellow) {
-      alert("Please select a fellow from the top dropdown first.");
+    if (!selectedTeacher) {
+      alert("Please select a Teacher from the top dropdown first.");
       return;
     }
     try {
       const formData = new FormData();
       formData.append("file", uploadFile);
-      formData.append("fellowId", selectedFellow._id || selectedFellow.id);
+      formData.append("TeacherId", selectedTeacher._id || selectedTeacher.id);
       formData.append("splitType", splitType);
 
       const data = await uploadCurriculumBulk(formData);
@@ -172,12 +172,12 @@ export default function MentorCurriculumTab({ user }) {
       alert("Please fill in Week and Topic Title");
       return;
     }
-    if (!selectedFellow) {
-      alert("Please select a fellow from the dropdown.");
+    if (!selectedTeacher) {
+      alert("Please select a Teacher from the dropdown.");
       return;
     }
     if (!curriculumPlan) {
-      alert("No curriculum exists for this fellow yet. Please bulk upload an Excel file first to generate their schedule.");
+      alert("No curriculum exists for this Teacher yet. Please bulk upload an Excel file first to generate their schedule.");
       return;
     }
     try {
@@ -215,7 +215,7 @@ export default function MentorCurriculumTab({ user }) {
       const data = await publishCurriculumPlan(curriculumPlan._id);
       if (data && data.success) {
         setCurriculumPlan({ ...curriculumPlan, status: 'published' });
-        alert("Curriculum Published & Sent to Fellow Successfully!");
+        alert("Curriculum Published & Sent to Teacher Successfully!");
       }
     } catch (err) {
       console.error("Failed to publish", err);
@@ -236,16 +236,16 @@ export default function MentorCurriculumTab({ user }) {
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <BookOpenCheck className="text-amber-600 w-7 h-7" /> Curriculum Planner
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Schedule, auto-split bulk data using AI, and assign to Fellows.</p>
+          <p className="text-slate-500 text-sm mt-1">Schedule, auto-split bulk data using AI, and assign to Teachers.</p>
         </div>
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* Assign Target Select */}
-          <SearchableFellowSelect 
-            fellows={assignedFellows} 
-            selectedFellow={selectedFellow} 
-            onChange={setSelectedFellow} 
+          <SearchableTeacherSelect 
+            Teachers={assignedTeachers} 
+            selectedTeacher={selectedTeacher} 
+            onChange={setSelectedTeacher} 
           />
 
           <div className="flex items-center gap-2">
@@ -358,7 +358,7 @@ export default function MentorCurriculumTab({ user }) {
                         onClick={handlePublish}
                         className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition"
                       >
-                        <Send className="w-4 h-4" /> Publish & Send to Fellow
+                        <Send className="w-4 h-4" /> Publish & Send to Teacher
                       </button>
                     </div>
                   )}
@@ -383,16 +383,16 @@ export default function MentorCurriculumTab({ user }) {
         {/* RIGHT 1 COLUMN: SIDEBAR SUMMARY & PREVIEW */}
         <div className="space-y-6">
           
-          {/* Fellow Progress Summary */}
+          {/* Teacher Progress Summary */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <h3 className="font-bold text-slate-800 text-base">Assignee Overview</h3>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold">
-                {selectedFellow ? (selectedFellow.name?.substring(0, 2).toUpperCase() || 'SF') : 'SF'}
+                {selectedTeacher ? (selectedTeacher.name?.substring(0, 2).toUpperCase() || 'SF') : 'SF'}
               </div>
               <div>
-                <p className="font-semibold text-sm text-slate-800">{selectedFellow ? selectedFellow.name : "Select a Fellow"}</p>
-                <p className="text-xs text-slate-500">{selectedFellow ? (selectedFellow.subject || "Fellow") : "No Fellow Selected"}</p>
+                <p className="font-semibold text-sm text-slate-800">{selectedTeacher ? selectedTeacher.name : "Select a Teacher"}</p>
+                <p className="text-xs text-slate-500">{selectedTeacher ? (selectedTeacher.subject || "Teacher") : "No Teacher Selected"}</p>
               </div>
             </div>
             <div className="space-y-2">
@@ -470,11 +470,11 @@ export default function MentorCurriculumTab({ user }) {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700">Assign to Fellow:</label>
-                <SearchableFellowSelect 
-                  fellows={assignedFellows} 
-                  selectedFellow={selectedFellow} 
-                  onChange={setSelectedFellow} 
+                <label className="text-xs font-bold text-slate-700">Assign to Teacher:</label>
+                <SearchableTeacherSelect 
+                  Teachers={assignedTeachers} 
+                  selectedTeacher={selectedTeacher} 
+                  onChange={setSelectedTeacher} 
                 />
               </div>
 
@@ -543,11 +543,11 @@ export default function MentorCurriculumTab({ user }) {
             
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Assign to Fellow:</label>
-                <SearchableFellowSelect 
-                  fellows={assignedFellows} 
-                  selectedFellow={selectedFellow} 
-                  onChange={setSelectedFellow} 
+                <label className="text-xs font-bold text-slate-700">Assign to Teacher:</label>
+                <SearchableTeacherSelect 
+                  Teachers={assignedTeachers} 
+                  selectedTeacher={selectedTeacher} 
+                  onChange={setSelectedTeacher} 
                 />
               </div>
               <div className="space-y-1.5">

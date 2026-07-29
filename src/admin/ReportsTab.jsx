@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AttendanceBar, BarChart, S, SectionCard, StatCard, StatusBadge } from "../components/Shared";
-import { getCourseAssignments, getTeacherAttendance, getTrainers, getCenters, getClasses, getChildren, getLessonPlans, getAdminLessonAssignments, getActivities, getCourses } from "../services/api";
+import { getCourseAssignments, getTeacherAttendance, getAdminMentors, getCenters, getClasses, getChildren, getLessonPlans, getAdminLessonAssignments, getActivities, getCourses } from "../services/api";
 
 function downloadCsv(filename, rows) {
   const csv = rows.map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -73,7 +73,7 @@ const BarChartSimple = ({ data, color = "#f59e0b", height = 100, label = "val" }
 export default function ReportsTab({ teachers = [], courses = [], setToast }) {
   const [activeReport, setActiveReport] = useState("teacherPerformance");
   const [assignments, setAssignments] = useState([]);
-  const [trainers, setTrainers] = useState([]);
+  const [mentors, setMentors] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [centers, setCenters] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -86,12 +86,12 @@ export default function ReportsTab({ teachers = [], courses = [], setToast }) {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      getCourseAssignments(), getTrainers(), getTeacherAttendance(),
+      getCourseAssignments(), getAdminMentors(), getTeacherAttendance(),
       getCenters(), getClasses(), getChildren(), getLessonPlans(),
       getAdminLessonAssignments(), getActivities()
     ]).then(([a, tr, at, ce, cl, ch, lp, pa, act]) => {
       setAssignments(a?.assignments || []);
-      setTrainers(tr?.trainers || []);
+      setMentors(tr?.mentors || []);
       setAttendanceRecords(at?.records || []);
       setCenters(ce?.centers || []);
       setClasses(cl?.classes || []);
@@ -191,7 +191,7 @@ export default function ReportsTab({ teachers = [], courses = [], setToast }) {
     { key: "enrollment", label: "Enrollment Trend", icon: "📈" },
     { key: "completion", label: "Course Completion", icon: "✅" },
     { key: "attendance", label: "Attendance", icon: "📅" },
-    { key: "trainer", label: "Trainers", icon: "🎯" },
+    { key: "mentor", label: "Mentors", icon: "🎓" },
   ];
 
   const exportTeacherPerformance = () => {
@@ -460,23 +460,22 @@ export default function ReportsTab({ teachers = [], courses = [], setToast }) {
         </SectionCard>
       )}
 
-      {/* Trainers */}
-      {activeReport === "trainer" && (
-        <SectionCard title="Trainer Performance Report" action={<button style={S.exportBtn} onClick={() => downloadCsv("trainer-report.csv", [["Trainer", "Subject", "Rating", "Status"], ...trainers.map(t => [t.name, t.subject, t.rating || 0, t.status])])}>Export CSV</button>}>
+      {/* Mentors */}
+      {activeReport === "mentor" && (
+        <SectionCard title="Mentor Performance Report" action={<button style={S.exportBtn} onClick={() => downloadCsv("mentor-report.csv", [["Mentor", "Email", "Specialization", "Status"], ...mentors.map(m => [m.name, m.email, m.mentorProfile?.specialization || "N/A", m.status])])}>Export CSV</button>}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr style={{ borderBottom: "2px solid #f3f4f6" }}>
-              {["Trainer", "Subject", "Sessions", "Rating", "Status"].map(h => (
+              {["Mentor", "Email", "Specialization", "Status"].map(h => (
                 <th key={h} style={{ padding: "10px 12px", fontSize: 11, fontWeight: 700, color: "#9ca3af", textAlign: "left", textTransform: "uppercase" }}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
-              {trainers.map(tr => (
-                <tr key={tr._id} style={{ borderBottom: "1px solid #f9fafb" }}>
-                  <td style={{ padding: "12px", fontSize: 13, fontWeight: 700 }}>{tr.name}</td>
-                  <td style={{ padding: "12px", fontSize: 12, color: "#6b7280" }}>{tr.subject}</td>
-                  <td style={{ padding: "12px", fontSize: 13 }}>{tr.sessions || 0}</td>
-                  <td style={{ padding: "12px", fontSize: 13 }}>⭐ {tr.rating || 0}</td>
-                  <td style={{ padding: "12px" }}><StatusBadge status={tr.status} /></td>
+              {mentors.map(m => (
+                <tr key={m._id} style={{ borderBottom: "1px solid #f9fafb" }}>
+                  <td style={{ padding: "12px", fontSize: 13, fontWeight: 700 }}>{m.name}</td>
+                  <td style={{ padding: "12px", fontSize: 12, color: "#6b7280" }}>{m.email}</td>
+                  <td style={{ padding: "12px", fontSize: 13 }}>{m.mentorProfile?.specialization || "N/A"}</td>
+                  <td style={{ padding: "12px" }}><StatusBadge status={m.status} /></td>
                 </tr>
               ))}
             </tbody>

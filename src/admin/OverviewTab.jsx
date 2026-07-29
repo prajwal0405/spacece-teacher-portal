@@ -50,7 +50,33 @@ function ActivityItem({ icon, text, time, color }) {
   );
 }
 
-export default function OverviewTab() {
+function getTeacherScore(t) {
+  if (t.teacherProfile?.performanceRating > 0) return Math.round(t.teacherProfile.performanceRating * 20);
+  let dynamicScore = 0;
+  const tp = t.teacherProfile || {};
+  if (tp.communityProfilingStatus === "completed") dynamicScore += 25;
+  if (tp.communityImmersionStatus === "completed") dynamicScore += 25;
+  if (tp.curriculumImplementationStatus === "completed") dynamicScore += 25;
+  if (tp.coursesCompleted > 0 && tp.coursesAssigned > 0) {
+      dynamicScore += Math.round((tp.coursesCompleted / tp.coursesAssigned) * 25);
+  } else if (tp.coursesCompleted > 0) {
+      dynamicScore += 25;
+  }
+  return dynamicScore > 100 ? 100 : dynamicScore;
+}
+
+function getInitialsAvatar(name, i) {
+  const initials = (name || "T").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
+  const colors = ["#ef4444", "#ef4444", "#ef4444", "#8b5cf6", "#3b82f6"];
+  const color = colors[i % colors.length];
+  return (
+    <div style={{ width: 40, height: 40, borderRadius: "50%", background: color, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, flexShrink: 0, boxShadow: "0 2px 5px rgba(0,0,0,0.1)" }}>
+      {initials}
+    </div>
+  );
+}
+
+function OverviewTab() {
   const [stats, setStats]         = useState(null);
   const [teachers, setTeachers]   = useState([]);
   const [centers, setCenters]     = useState([]);
@@ -269,22 +295,23 @@ export default function OverviewTab() {
         <SectionCard title="🏆 Top Performing Teachers">
           {topTeachers.length === 0 ? (
             <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "20px 0" }}>No approved teachers yet.</div>
-          ) : topTeachers.map((t, i) => {
-            const score = Math.round((t.teacherProfile?.performanceRating || 0) * 20);
+          ) : [...topTeachers].map(t => ({...t, dynamicScore: getTeacherScore(t)})).sort((a,b)=> b.dynamicScore - a.dynamicScore).slice(0,5).map((t, i) => {
+            const score = t.dynamicScore;
             const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
             return (
-              <div key={t._id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #f3f4f6" }}>
-                <span style={{ fontSize: 16, flexShrink: 0 }}>{medals[i]}</span>
-                <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(t.name)}`} alt=""
-                  style={{ width: 30, height: 30, borderRadius: "50%", border: "1.5px solid #e5e7eb", flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1c1917", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
-                  <div style={{ fontSize: 10, color: "#9ca3af" }}>{t.teacherProfile?.center?.name || "No center"}</div>
-                  <div style={{ height: 4, background: "#f3f4f6", borderRadius: 4, overflow: "hidden", marginTop: 4 }}>
-                    <div style={{ height: "100%", width: `${score}%`, background: score >= 75 ? "#10b981" : score >= 50 ? "#f59e0b" : "#ef4444", borderRadius: 4, transition: "width 0.8s" }} />
+              <div key={t._id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid #f3f4f6" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{medals[i]}</span>
+                  {getInitialsAvatar(t.name, i)}
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1917", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
+                    <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>{t.teacherProfile?.center?.name || "Spacece Mumbai Center"}</div>
+                    <div style={{ height: 4, background: "#f3f4f6", borderRadius: 4, overflow: "hidden", width: 140 }}>
+                      <div style={{ height: "100%", width: `${score}%`, background: score > 0 ? "#10b981" : "#f59e0b", borderRadius: 4, transition: "width 0.8s" }} />
+                    </div>
                   </div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 800, color: score >= 75 ? "#10b981" : "#f59e0b", flexShrink: 0 }}>{score}%</span>
+                <span style={{ fontSize: 14, fontWeight: 900, color: score > 0 ? "#10b981" : "#f59e0b", flexShrink: 0 }}>{score}%</span>
               </div>
             );
           })}
@@ -349,3 +376,5 @@ export default function OverviewTab() {
     </div>
   );
 }
+
+export default OverviewTab;
