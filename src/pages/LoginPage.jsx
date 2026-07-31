@@ -621,7 +621,11 @@ if (!name || !email || !phone || !address || !password || !confirmPassword) {
       setToast({ msg: "Please fill all required fields.", type: "error" });
       return;
     }
-
+    const nameRegex = /^[A-Za-z][A-Za-z.\s]{1,49}$/;
+    if (!nameRegex.test(name.trim())) {
+      setToast({ msg: "Please enter a valid name (letters only, no numbers or symbols).", type: "error" });
+      return;
+    }
     const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email.trim())) {
       setToast({ msg: "Please enter a valid email address.", type: "error" });
@@ -788,8 +792,12 @@ if (!name || !email || !phone || !address || !password || !confirmPassword) {
     <span style={ci.fieldIcon}>👤</span>
     <input style={{ ...S.input, ...ci.input }} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Dr. Jane Smith" />
   </div>
-</div>
-        {[
+  {form.name && (
+    <p style={{ fontSize: 10, fontWeight: 600, marginTop: 3, marginBottom: 0, color: /^[A-Za-z][A-Za-z.\s]{1,49}$/.test(form.name.trim()) ? "#10b981" : "#ef4444" }}>
+      {/^[A-Za-z][A-Za-z.\s]{1,49}$/.test(form.name.trim()) ? "✅ Valid name" : "❌ Name should contain letters only"}
+    </p>
+  )}
+</div>        {[
           { key: "email", label: "Email Address *", icon: "📧", type: "email", ph: "teacher@school.edu" },
           { key: "phone", label: "Phone (10-Digit Mobile) *", icon: "📱", type: "tel", ph: "9876543210" },
         ].map(f => (

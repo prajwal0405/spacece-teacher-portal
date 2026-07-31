@@ -154,6 +154,7 @@ router.get("/activities", async (req, res) => {
 
 router.post("/activities", requireAuth, async (req, res) => {
   try {
+      console.log("==> Creating activity, req.user:", req.user);
     const { activityName, ageGroup, developmentalDomain, materialsRequired, expectedLearningOutcomes, duration, level, className, type, milestone, purposeOfActivity, howToConduct, facilitatorRole, dayNumber, learningObjectives, activities, resources, instructions, expectedOutput, notes } = req.body;
     
     if (!activityName) {

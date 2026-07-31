@@ -688,9 +688,9 @@ export function ImpactCapstoneTab({ user, setToast, onUserUpdate }) {
   };
 
   const handleDownload = (e, file) => {
-    e.preventDefault();
-    setToast?.({ msg: `Downloading ${file}...`, type: "info" });
-  };
+  e.preventDefault();
+  setToast?.({ msg: `${file} is not available yet. Please check back later.`, type: "error" });
+};
 
   return (
     <div style={{ animation: "fadeIn 0.3s ease" }}>

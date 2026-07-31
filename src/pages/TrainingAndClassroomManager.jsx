@@ -99,7 +99,7 @@ function BulkUploadModal({ onClose, onSuccess }) {
 }
 
 /* ── Manual Activity Creation Form ── */
-function CreateActivityModal({ onClose, onSuccess }) {
+function CreateActivityModal({ onClose, onSuccess, user }) {
   const [form, setForm] = useState({
     activityName: "",
     milestone: "",
@@ -135,11 +135,12 @@ function CreateActivityModal({ onClose, onSuccess }) {
     setSubmitting(true);
     setError("");
     try {
-      const payload = { ...form };
-      if (form.dayNumber) payload.dayNumber = Number(form.dayNumber);
-      else delete payload.dayNumber;
-      Object.keys(payload).forEach(k => { if (payload[k] === "") delete payload[k]; });
-      const res = await createActivityBank(payload);
+  const payload = { ...form };
+  if (form.dayNumber) payload.dayNumber = Number(form.dayNumber);
+  else delete payload.dayNumber;
+  Object.keys(payload).forEach(k => { if (payload[k] === "") delete payload[k]; });
+  payload.createdBy = user?._id || user?.id;
+  const res = await createActivityBank(payload);
       if (res.success !== false) {
         onSuccess("Activity created successfully!");
         onClose();
@@ -411,6 +412,10 @@ function MarkCompleteModal({ activity, user, onSubmit, onClose }) {
     if (!description.trim()) {
       setError("Please write a description of the completed activity.");
       return;
+    }
+    if (!userCenter || !userClass) {
+    setError("No class assigned to your account. Please contact admin.");
+    return;
     }
     setSubmitting(true);
     setError("");
@@ -721,6 +726,7 @@ export default function TrainingAndClassroomManager({ user }) {
   const [toast, setToast] = useState({ msg: "", type: "" });
 
   const loadData = async () => {
+  console.log("==> Fetching activities with createdBy:", user?._id || user?.id);
     setLoading(true);
     try {
       const [lessonRes, bankRes, submissionRes] = await Promise.all([
@@ -902,15 +908,16 @@ export default function TrainingAndClassroomManager({ user }) {
       )}
 
       {/* Manual Create Modal */}
-      {showCreateModal && (
-        <CreateActivityModal
-          onClose={() => setShowCreateModal(false)}
-          onSuccess={(msg) => {
-            setToast({ msg, type: "success" });
-            loadData();
-          }}
-        />
-      )}
+{showCreateModal && (
+  <CreateActivityModal
+    onClose={() => setShowCreateModal(false)}
+    onSuccess={(msg) => {
+      setToast({ msg, type: "success" });
+      loadData();
+    }}
+    user={user}
+  />
+)}
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>

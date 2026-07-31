@@ -1280,10 +1280,10 @@ export function submitCapstoneMilestone(data) {
   });
 }
 
-export function submitPDCACycle(data) {
+export function submitPDCACycle(plan, doField, check, act) {
   return request("/api/mentor/pdca", {
     method: "POST",
-    body: JSON.stringify(data)
+    body: JSON.stringify({ plan, do: doField, check, act })
   });
 }
 

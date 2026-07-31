@@ -1391,7 +1391,7 @@ function TeacherFeedbackTab({ user, setToast }) {
         anonymous,
         status: "pending"
       });
-      setToast?.({ msg: "Feedback submitted successfully! Thank you.", type: "success" });
+      setToast?.({ msg: "Feedback submitted successfully! It will appear in your submissions once approved by admin.", type: "success" });
       setSuggestion(""); setRating(0); setTRating(0); setCourse(""); setAnonymous(false);
     } catch(err) {
       setToast?.({ msg: err.message || "Failed to submit feedback.", type: "error" });
@@ -1466,13 +1466,16 @@ function TeacherFeedbackTab({ user, setToast }) {
 
         <SectionCard title="📋 My Previous Submissions">
           {loading ? (
-            <div style={{textAlign:"center", padding:30, color:"#9ca3af"}}>Loading...</div>
-          ) : myFeedbacks.length === 0 ? (
-            <div style={{textAlign:"center", padding:30, color:"#94a3b8"}}>
-              <div style={{fontSize:36, marginBottom:8}}>💬</div>
-              <div style={{fontSize:13}}>You haven't submitted any feedback yet.</div>
-            </div>
-          ) : (
+  <div style={{textAlign:"center", padding:30, color:"#9ca3af"}}>Loading...</div>
+) : myFeedbacks.length === 0 ? (
+  <div style={{textAlign:"center", padding:30, color:"#94a3b8"}}>
+    <div style={{fontSize:36, marginBottom:8}}>💬</div>
+    <div style={{fontSize:13}}>You haven't submitted any feedback yet.</div>
+    <div style={{fontSize:11, marginTop:6, color:"#b45309"}}>
+      Note: Submitted feedback appears here only after admin approval.
+    </div>
+  </div>
+) : (
             <div style={{display:"flex", flexDirection:"column", gap:10}}>
               {myFeedbacks.map((f,i) => (
                 <div key={f._id||i} style={{padding:"12px 14px", background:"#f9fafb", borderRadius:12, border:"1px solid #f3f4f6"}}>
@@ -1704,6 +1707,24 @@ function ParentCapacityBuildingTab({ user, setToast }) {
                       ))}
                     </tbody>
                   </table>
+                  {sess.content?.length > 0 && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", marginBottom: 6 }}>Content</div>
+                      {sess.content.map((block, ci) => (
+                        <div key={ci} style={{ marginBottom: 8 }}>
+                          {block.heading && <div style={{ fontSize: 12, fontWeight: 700, color: "#1c1917" }}>{block.heading}</div>}
+                          <div style={{ fontSize: 12, color: "#374151", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{block.body}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {sess.reflection && (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#1c1917", marginBottom: 6 }}>Reflection</div>
+                      <div style={{ fontSize: 12, color: "#374151", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{sess.reflection}</div>
+                    </div>
+                  )}
                   {sess.homePractice && (
                     <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>Home Practice: {sess.homePractice}</div>
                   )}

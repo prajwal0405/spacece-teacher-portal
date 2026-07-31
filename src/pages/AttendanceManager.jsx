@@ -409,9 +409,14 @@ export default function AttendanceManager({ user }) {
   };
   // End: Dnyaneshwari Thorat
 
-  const handleAddStudent = (e) => {
-    e.preventDefault();
-    const classId = selectedClassId || (teacherProfile?.teacherProfile?.classes || [])[0]?._id || (teacherProfile?.teacherProfile?.classes || [])[0];
+const handleAddStudent = (e) => {
+  e.preventDefault();
+  const classId = selectedClassId || (teacherProfile?.teacherProfile?.classes || [])[0]?._id || (teacherProfile?.teacherProfile?.classes || [])[0];
+
+  if (!classId) {
+    triggerToast("No class assigned to your account. Please contact admin.", true);
+    return;
+  }
 
     // Start: Dnyaneshwari Thorat
     if (bulkMode) {
@@ -553,7 +558,14 @@ export default function AttendanceManager({ user }) {
           <h1 style={S.pageTitle}>Children Attendance</h1>
           <p style={S.pageSub}>Manage rosters and record daily attendance registers.</p>
         </div>
-        <button onClick={() => setShowAddModal(true)} style={S.primaryBtn}>+ Enroll Child</button>
+        <button
+       onClick={() => setShowAddModal(true)}
+      style={{ ...S.primaryBtn, opacity: (!loading && classes.length === 0) ? 0.5 : 1, cursor: (!loading && classes.length === 0) ? "not-allowed" : "pointer" }}
+      disabled={!loading && classes.length === 0}
+      title={classes.length === 0 ? "No class assigned — contact admin" : ""}
+>
+  + Enroll Child
+</button>
       </div>
 
       {/* Toast banners */}
@@ -567,7 +579,11 @@ export default function AttendanceManager({ user }) {
           ⚠️ {errorMsg}
         </div>
       )}
-
+     {!loading && classes.length === 0 && (
+     <div style={{ padding: "12px 16px", marginBottom: 16, background: "#fef3c7", color: "#92400e", borderRadius: 10, fontSize: 13, fontWeight: 600 }}>
+     ⚠️ No class is assigned to your account yet. Please contact your admin to assign a class before enrolling children.
+     </div>
+      )}
       {/* Start: Dnyaneshwari Thorat */}
       <SectionCard title="📁 Excel Bulk Enrollment">
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
