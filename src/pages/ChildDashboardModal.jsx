@@ -1,6 +1,7 @@
 // Prajwal start
 import { useState, useEffect } from "react";
 import { SectionCard, S, Badge, StatusBadge } from "../components/Shared";
+import { generateAIChildFeedback, submitChildFeedback } from "../services/api";
 
 /* ─────────────────────────────────────────
    Child Dashboard — Module 1
@@ -1039,6 +1040,164 @@ const SECTION_ICONS = {
   adaptive: "🎒",
   sensory_regulation: "🎨",
 };
+/* ─────────────────────────────────────────
+   Teacher-Side AI Feedback Generation
+   Freeform notes → AI structuring → teacher
+   review/edit → submit to admin.
+───────────────────────────────────────── */
+const EMPTY_STRUCTURED = { strengths: "", areasNeedingSupport: "", recommendation: "" };
+
+function ChildFeedbackTab({ child }) {
+  const [freeformText, setFreeformText] = useState("");
+  const [structured, setStructured] = useState(null); // null until AI has generated something
+  const [aiProvider, setAiProvider] = useState("local");
+  const [generating, setGenerating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    // Reset local state whenever a different child's profile is opened.
+    setFreeformText("");
+    setStructured(null);
+    setAiProvider("local");
+    setGenerating(false);
+    setSubmitting(false);
+    setError("");
+    setSubmitted(false);
+  }, [child?.id]);
+
+  const handleGenerate = async () => {
+    if (!freeformText.trim()) {
+      setError("Please write some observations before generating AI feedback.");
+      return;
+    }
+    setError("");
+    setGenerating(true);
+    try {
+      const res = await generateAIChildFeedback({ childId: child.id, freeformText });
+      const fb = res?.feedback;
+      if (fb) {
+        setStructured({
+          strengths: fb.strengths || "",
+          areasNeedingSupport: fb.areasNeedingSupport || "",
+          recommendation: fb.recommendation || "",
+        });
+        setAiProvider(fb.provider || "local");
+      } else {
+        setError("AI did not return a result. Please try again.");
+      }
+    } catch (err) {
+      setError(err?.message || "Failed to generate AI feedback. Please try again.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!structured) return;
+    setError("");
+    setSubmitting(true);
+    try {
+      await submitChildFeedback({
+        childId: child.id,
+        freeformText,
+        strengths: structured.strengths,
+        areasNeedingSupport: structured.areasNeedingSupport,
+        recommendation: structured.recommendation,
+        aiProvider,
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setError(err?.message || "Failed to submit feedback. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const updateField = (key, value) => {
+    setStructured((prev) => ({ ...(prev || EMPTY_STRUCTURED), [key]: value }));
+  };
+
+  const structuredField = (label, key, rows = 4) => (
+    <div style={{ marginBottom: 16 }}>
+      <label style={S.label}>{label}</label>
+      <textarea
+        style={{ ...S.input, height: rows * 20, resize: "vertical" }}
+        value={structured?.[key] || ""}
+        onChange={(e) => updateField(key, e.target.value)}
+        disabled={submitted}
+      />
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {submitted && (
+        <div style={{ padding: "12px 16px", borderRadius: 10, background: "#d1fae5", color: "#065f46", fontWeight: 700, fontSize: 13 }}>
+          ✅ Feedback submitted to admin for {child.name}.
+        </div>
+      )}
+
+      {error && (
+        <div style={{ padding: "12px 16px", borderRadius: 10, background: "#fee2e2", color: "#991b1b", fontWeight: 600, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+
+      <SectionCard title="Freeform Observations">
+        <div style={{ marginBottom: 8 }}>
+          <label style={S.label}>Child</label>
+          <div style={{ fontSize: 13, color: "#374151", padding: "8px 0", fontWeight: 700 }}>{child.name}</div>
+        </div>
+        <div>
+          <label style={S.label}>Write your observations in any format</label>
+          <textarea
+            style={{ ...S.input, height: 140, resize: "vertical" }}
+            placeholder={`e.g. "${child.name} shared toys with classmates today, but struggled to sit still during story time. Needs more practice with fine motor tasks like buttoning..."`}
+            value={freeformText}
+            onChange={(e) => setFreeformText(e.target.value)}
+            disabled={submitted}
+          />
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+          <button
+            onClick={handleGenerate}
+            disabled={generating || submitted || !freeformText.trim()}
+            style={{ ...S.primaryBtn, opacity: generating || submitted ? 0.7 : 1 }}
+          >
+            {generating ? "Generating..." : "🤖 Generate AI Feedback"}
+          </button>
+        </div>
+      </SectionCard>
+
+      {structured && (
+        <SectionCard
+          title="AI-Structured Feedback — Review & Edit"
+          action={<Badge children={aiProvider === "local" ? "Local draft (no AI key configured)" : `Generated · ${aiProvider}`} color="#7c3aed" bg="#ede9fe" />}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <label style={S.label}>Child Name</label>
+            <div style={{ fontSize: 13, color: "#374151", padding: "8px 0" }}>{child.name}</div>
+          </div>
+          {structuredField("Strengths Observed", "strengths")}
+          {structuredField("Areas Needing Support", "areasNeedingSupport")}
+          {structuredField("Teacher Recommendation", "recommendation", 3)}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || submitted}
+              style={{ ...S.primaryBtn, opacity: submitting || submitted ? 0.7 : 1 }}
+            >
+              {submitted ? "✓ Submitted" : submitting ? "Submitting..." : "📤 Submit to Admin"}
+            </button>
+          </div>
+        </SectionCard>
+      )}
+    </div>
+  );
+}
 
 function ActivitySuggestionsTab({ child }) {
   const [expandedSections, setExpandedSections] = useState({});
@@ -1508,6 +1667,7 @@ export default function ChildDashboardModal({ child, onClose }) {
           {tabBtn("profile", "Child Profile", "🧾")}
           {tabBtn("assessment", "Child Assessment", "📊")}
           {tabBtn("activities", "Activity Suggestions", "🎯")}
+          {tabBtn("ai_feedback", "AI Feedback", "🤖")}
         </div>
 
         {/* Content */}
@@ -1520,6 +1680,9 @@ export default function ChildDashboardModal({ child, onClose }) {
           )}
           {tab === "activities" && (
             <ActivitySuggestionsTab key={`${child.id}_${refreshKey}`} child={child} />
+          )}
+          {tab === "ai_feedback" && (
+            <ChildFeedbackTab key={child.id} child={child} />
           )}
         </div>
 

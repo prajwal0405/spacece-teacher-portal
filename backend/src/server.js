@@ -21,6 +21,7 @@ import { sendNotification, broadcastNotification, CHANNELS, TEMPLATES, sendSms, 
 import { autoSeed } from "./auto-seed.js";
 import { generateAICourse } from "./services/aiCourseGenerator.js";
 import { generateAILessonPlan } from "./services/aiLessonPlanner.js";
+import { generateAIChildFeedback } from "./services/aiChildFeedback.js"; 
 import dailyTaskAutomationRoutes from "./routes/dailyTaskAutomationRoutes.js";
 import { startDailyTaskAutomationCron } from "./cron/dailyTaskCron.js";
 import { User } from "./models/User.js";
@@ -37,6 +38,7 @@ import { LessonCompletionReport } from "./models/LessonCompletionReport.js";
 import { ActivitySubmission } from "./models/ActivitySubmission.js";
 import { Trainer } from "./models/Trainer.js";
 import { Feedback } from "./models/Feedback.js";
+import { ChildFeedback } from "./models/ChildFeedback.js";
 import { FileAsset } from "./models/FileAsset.js";
 import { ChildAttendanceSession, TeacherAttendanceRecord } from "./models/Attendance.js";
 import { Certificate } from "./models/Certificate.js";
@@ -59,6 +61,7 @@ import { initSocket, createAndEmitNotification } from "./socket.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "../.env") });
+console.log("[startup] AI providers configured:", { groq: !!process.env.GROQ_API_KEY, mistral: !!process.env.MISTRAL_API_KEY, gemini: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY) });
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -2928,6 +2931,101 @@ app.post("/api/ai/generate-lesson-plan", requireAuth, requireRole("teacher", "ad
     res.json({ lessonPlan: result });
   } catch (error) {
     if (error.status) return res.status(error.status).json({ message: error.message });
+    next(error);
+  }
+});
+
+// ==========================================
+// CHILD AI FEEDBACK (teacher-side)
+// ==========================================
+
+// Resolve the class IDs a teacher is assigned to, used to make sure a
+// teacher can only generate/submit feedback for children in their own class.
+async function getTeacherClassIds(teacherId) {
+  const teacher = await User.findById(teacherId).select("teacherProfile");
+  const classIds = teacher?.teacherProfile?.classes || [];
+  const singleClassId = teacher?.teacherProfile?.class;
+  return [...new Set([...classIds.map((id) => id.toString()), singleClassId?.toString()].filter(Boolean))];
+}
+
+app.post("/api/ai/generate-child-feedback", requireAuth, requireRole("teacher", "admin"), async (req, res, next) => {
+  try {
+    const { childId, freeformText } = req.body || {};
+    if (!childId || !freeformText || !String(freeformText).trim()) {
+      return res.status(400).json({ message: "childId and freeformText are required." });
+    }
+
+    const child = await Child.findById(childId);
+    if (!child) return res.status(404).json({ message: "Child not found." });
+
+    if (req.user.role === "teacher") {
+      const allowedClassIds = await getTeacherClassIds(req.user.id);
+      if (!allowedClassIds.includes(child.class?.toString())) {
+        return res.status(403).json({ message: "You are not assigned to this child's class." });
+      }
+    }
+
+    const result = await generateAIChildFeedback({
+      childName: child.fullName,
+      freeformText: String(freeformText),
+    });
+    res.json({ feedback: result });
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ message: error.message });
+    next(error);
+  }
+});
+
+app.post("/api/child-feedback", requireAuth, requireRole("teacher"), async (req, res, next) => {
+  try {
+    const { childId, freeformText, strengths, areasNeedingSupport, recommendation, aiProvider } = req.body || {};
+    if (!childId || !freeformText || !String(freeformText).trim()) {
+      return res.status(400).json({ message: "childId and freeformText are required." });
+    }
+
+    const child = await Child.findById(childId);
+    if (!child) return res.status(404).json({ message: "Child not found." });
+
+    const allowedClassIds = await getTeacherClassIds(req.user.id);
+    if (!allowedClassIds.includes(child.class?.toString())) {
+      return res.status(403).json({ message: "You are not assigned to this child's class." });
+    }
+
+    const saved = await ChildFeedback.create({
+      child: child._id,
+      teacher: req.user.id,
+      freeformText: String(freeformText),
+      strengths: strengths || "",
+      areasNeedingSupport: areasNeedingSupport || "",
+      recommendation: recommendation || "",
+      aiProvider: aiProvider || "local",
+      status: "submitted",
+    });
+
+    res.status(201).json({ feedback: saved });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/child-feedback/mine", requireAuth, requireRole("teacher"), async (req, res, next) => {
+  try {
+    const items = await ChildFeedback.find({ teacher: req.user.id })
+      .populate("child", "fullName")
+      .sort({ createdAt: -1 });
+    res.json({ feedback: items });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/child-feedback/:childId", requireAuth, requireRole("teacher", "admin"), async (req, res, next) => {
+  try {
+    const items = await ChildFeedback.find({ child: req.params.childId })
+      .populate("teacher", "name email")
+      .sort({ createdAt: -1 });
+    res.json({ feedback: items });
+  } catch (error) {
     next(error);
   }
 });

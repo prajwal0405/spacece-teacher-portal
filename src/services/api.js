@@ -1289,3 +1289,26 @@ export function generateAILessonPlan(data) {
    export function getCourseAssessment(courseId) {
   return request(`/api/courses/${courseId}/assessment`);
 }
+
+// Child AI Feedback (teacher-side)
+export function generateAIChildFeedback(data) {
+  return request("/api/ai/generate-child-feedback", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function submitChildFeedback(data) {
+  return request("/api/child-feedback", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function getChildFeedback(childId) {
+  return request(`/api/child-feedback/${childId}`);
+}
+
+export function getMyChildFeedback() {
+  return request("/api/child-feedback/mine");
+}

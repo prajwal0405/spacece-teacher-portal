@@ -9,7 +9,8 @@ import TrainingAndClassroomManager from "./TrainingAndClassroomManager";
 import GeotagAttendance from "./GeotagAttendance";
 import ProctoredAssessment from "./Proctoredassessment";      // now reading/notes based, same filename
 import TeacherCourseNotes from "./TeacherCourseNotes";    // NEW — replaces the old video CoursesTab
-import LessonPlannerTab from "./LessonPlannerTab";     
+import LessonPlannerTab from "./LessonPlannerTab";    
+import { getMyChildFeedback } from "../services/api"; 
 import {
   getTeacherProgress,
   getNotifications,
@@ -1346,6 +1347,7 @@ function NotificationsTab({ notifications = [], onMarkRead, onMarkAllRead }) {
 
 function TeacherFeedbackTab({ user, setToast }) {
   const [rating, setRating]         = useState(0);
+  const [feedbackSubTab, setFeedbackSubTab] = useState("course");
   const [trainerRating, setTRating] = useState(0);
   const [suggestion, setSuggestion] = useState("");
   const [course, setCourse]         = useState("");
@@ -1402,6 +1404,27 @@ function TeacherFeedbackTab({ user, setToast }) {
 
   return (
     <div style={{ animation: "fadeIn 0.3s ease" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <button onClick={() => setFeedbackSubTab("course")}
+          style={{ padding: "8px 16px", borderRadius: 8, border: "1.5px solid", cursor: "pointer", fontSize: 12, fontWeight: 700,
+            borderColor: feedbackSubTab === "course" ? "#6c63ff" : "#e5e7eb",
+            background: feedbackSubTab === "course" ? "#ede9fe" : "white",
+            color: feedbackSubTab === "course" ? "#4f46e5" : "#6b7280" }}>
+          📝 Course Feedback
+        </button>
+        <button onClick={() => setFeedbackSubTab("child")}
+          style={{ padding: "8px 16px", borderRadius: 8, border: "1.5px solid", cursor: "pointer", fontSize: 12, fontWeight: 700,
+            borderColor: feedbackSubTab === "child" ? "#6c63ff" : "#e5e7eb",
+            background: feedbackSubTab === "child" ? "#ede9fe" : "white",
+            color: feedbackSubTab === "child" ? "#4f46e5" : "#6b7280" }}>
+          🧒 My Child Feedback
+        </button>
+      </div>
+
+      {feedbackSubTab === "child" ? (
+        <TeacherChildFeedbackTab />
+      ) : (
+      <>
       <h1 style={S.pageTitle}>Submit Feedback</h1>
       <p style={S.pageSub}>Share your training experience and help us improve.</p>
 
@@ -1499,6 +1522,8 @@ function TeacherFeedbackTab({ user, setToast }) {
           )}
         </SectionCard>
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -1844,6 +1869,44 @@ function ParentCapacityBuildingTab({ user, setToast }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function TeacherChildFeedbackTab() {
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getMyChildFeedback()
+      .then((data) => setFeedbacks(data.feedback || []))
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ textAlign: "center", padding: 60, color: "#94a3b8" }}>Loading...</div>;
+
+  const total = feedbacks.length;
+  const pending = feedbacks.filter(f => f.reviewStatus !== "reviewed").length;
+
+  return (
+    <div style={{ padding: 24 }}>
+      <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 20 }}>My Child Feedback</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 16, marginBottom: 24 }}>
+        <div style={{ background: "#fff", borderRadius: 14, padding: 18, border: "1px solid #eee", borderTop: "4px solid #6c63ff" }}>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{total}</div>
+          <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600 }}>TOTAL SUBMITTED</div>
+        </div>
+        <div style={{ background: "#fff", borderRadius: 14, padding: 18, border: "1px solid #eee", borderTop: "4px solid #ef4444" }}>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{pending}</div>
+          <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600 }}>PENDING REVIEW</div>
+        </div>
+      </div>
+      {feedbacks.map(fb => (
+        <div key={fb._id} style={{ background: "#fff", borderRadius: 12, padding: 16, border: "1px solid #eee", marginBottom: 10 }}>
+          <b>{fb.childName || fb.child?.fullName}</b> — {fb.reviewStatus === "reviewed" ? "✓ Reviewed" : "Pending"}
+        </div>
+      ))}
     </div>
   );
 }
