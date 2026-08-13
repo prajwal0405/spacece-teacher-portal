@@ -1,0 +1,1 @@
+import mongoose from 'mongoose'; async function run() { try { await mongoose.connect('mongodb://127.0.0.1:27017/teacher_training_portal'); const collections = await mongoose.connection.db.listCollections().toArray(); console.log(collections.map(c => c.name)); } catch(e) { console.error(e) } finally { await mongoose.disconnect(); } } run();

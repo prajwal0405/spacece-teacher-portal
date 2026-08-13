@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { S, SectionCard, Toast, StatCard, StatusBadge, SearchBar, Modal } from "../components/Shared";
-import { uploadFile, submitFeedback, getFeedbacks, updateMentorMe, changeMentorPassword, recordMenteeObservation, getMenteeObservations, submitCapstoneMilestone, getCapstoneSubmissions, submitPDCACycle, getPDCACycles, getMentorFellows, updateFellowStatus, getMentorMe, updateMenteeTracking, claimFellow, unclaimFellow, deleteMentorFellow } from "../services/api";
+import { uploadFile, submitFeedback, getFeedbacks, updateMentorMe, changeMentorPassword, recordMenteeObservation, getMenteeObservations, submitCapstoneMilestone, getCapstoneSubmissions, submitPDCACycle, getPDCACycles, getMentorFellows, updateFellowStatus, getMentorMe, updateMenteeTracking, claimFellow, unclaimFellow, deleteMentorFellow, submitPDCAPlanDraft, updatePDCAPlanDraft, publishPDCAPlan, savePDCACheckDraft, submitPDCACheck } from "../services/api";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -1518,18 +1518,41 @@ export function ImpactCapstoneTab({ user, setToast, onUserUpdate }) {
    - History cards now show which mentee the cycle belongs to.
    - Milestone/cycle numbering is computed per-mentee, not globally across all mentees.
 */
+
+
+import { 
+  getPDCACycles, 
+  submitPDCAPlanDraft, 
+  updatePDCAPlanDraft, 
+  publishPDCAPlan, 
+  savePDCACheckDraft, 
+  submitPDCACheck 
+} from "../services/api";
+
+const S = {
+  label: { display: "block", marginBottom: 6, fontSize: 13, fontWeight: 700, color: "#1e293b", textTransform: "uppercase", letterSpacing: "0.5px" },
+  input: { width: "100%", padding: "12px 14px", border: "2px solid #e2e8f0", borderRadius: 12, fontSize: 14, outline: "none", transition: "all 0.2s", marginBottom: 16 },
+  primaryBtn: { background: "linear-gradient(135deg, #4f46e5, #3b82f6)", color: "white", border: "none", padding: "12px 24px", borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)", transition: "all 0.2s" },
+  secondaryBtn: { background: "#f8fafc", color: "#475569", border: "1px solid #cbd5e1", padding: "12px 24px", borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: "pointer" },
+};
+
+
 export function PDCATab({ user, setToast, onUserUpdate }) {
   const mentees = user?.mentorProfile?.assignedTeachers || [];
-  const [selectedMenteeId, setSelectedMenteeId] = useState(mentees[0]?._id || "");
-  const [pdcaForm, setPdcaForm] = useState({ plan: "", do: "", check: "", act: "" });
-  const [submitting, setSubmitting] = useState(false);
-  const [history, setHistory] = useState([]);
+  const [cycles, setCycles] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [planModal, setPlanModal] = useState(null); // 'create' or cycle object
+  const [planForm, setPlanForm] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const [checkModal, setCheckModal] = useState(null);
+  const [checkForm, setCheckForm] = useState({});
 
   const fetchCycles = () => {
     setLoading(true);
     getPDCACycles()
-      .then(res => setHistory(res.cycles || []))
+      .then(res => setCycles(res.cycles || []))
       .catch(err => console.error("Failed to fetch PDCA", err))
       .finally(() => setLoading(false));
   };
@@ -1538,139 +1561,330 @@ export function PDCATab({ user, setToast, onUserUpdate }) {
     fetchCycles();
   }, []);
 
-  // Keep the selected mentee valid if the mentee list changes (e.g. after claim/unclaim)
-  useEffect(() => {
-    if (!selectedMenteeId && mentees.length > 0) {
-      setSelectedMenteeId(mentees[0]._id);
+  const openPlanModal = (cycle = null) => {
+    if (cycle) {
+      setPlanForm({
+        menteeId: cycle.menteeId?._id || cycle.menteeId,
+        planTitle: cycle.planTitle || "",
+        planObjective: cycle.planObjective || "",
+        planArea: cycle.planArea || "",
+        planExpectedOutcomes: cycle.planExpectedOutcomes || "",
+        planActivities: cycle.planActivities || "",
+        planInstructions: cycle.planInstructions || "",
+        planStartDate: cycle.planStartDate ? new Date(cycle.planStartDate).toISOString().split('T')[0] : "",
+        planTargetDate: cycle.planTargetDate ? new Date(cycle.planTargetDate).toISOString().split('T')[0] : ""
+      });
+      setPlanModal(cycle);
+    } else {
+      setPlanForm({ menteeId: mentees[0]?._id || "", planTitle: "" });
+      setPlanModal("create");
     }
-  }, [mentees, selectedMenteeId]);
+  };
 
-  // Cycle numbering/history filtering is per-mentee, not global
-  const cyclesForSelectedMentee = history.filter(
-    h => (h.menteeId?._id || h.menteeId) === selectedMenteeId
-  );
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedMenteeId) {
-      setToast?.({ msg: "Please select a mentee for this PDCA cycle.", type: "error" });
-      return;
-    }
-    if (!pdcaForm.plan || !pdcaForm.do || !pdcaForm.check || !pdcaForm.act) {
-      setToast?.({ msg: "Please fill out all PDCA fields.", type: "error" });
+  const handlePlanAction = async (isPublish) => {
+    if (!planForm.menteeId || !planForm.planTitle) {
+      setToast?.({ msg: "Mentee and Plan Title are required.", type: "error" });
       return;
     }
     setSubmitting(true);
-
     try {
-      const cycleNumber = cyclesForSelectedMentee.length + 1;
-      await submitPDCACycle(cycleNumber, pdcaForm.plan, pdcaForm.do, pdcaForm.check, pdcaForm.act, selectedMenteeId);
-      setToast?.({ msg: "PDCA cycle recorded successfully!", type: "success" });
-      setPdcaForm({ plan: "", do: "", check: "", act: "" });
+      let cycleId;
+      if (planModal === "create") {
+        const res = await submitPDCAPlanDraft(planForm);
+        cycleId = res.cycle._id;
+      } else {
+        cycleId = planModal._id;
+        await updatePDCAPlanDraft(cycleId, planForm);
+      }
+      
+      if (isPublish) {
+        await publishPDCAPlan(cycleId);
+        setToast?.({ msg: "Plan Published Successfully!", type: "success" });
+      } else {
+        setToast?.({ msg: "Draft Saved.", type: "success" });
+      }
+      setPlanModal(null);
       fetchCycles();
     } catch (err) {
-      setToast?.({ msg: err.message || "Failed to save PDCA cycle", type: "error" });
+      setToast?.({ msg: err.message || "Failed to save plan.", type: "error" });
     } finally {
       setSubmitting(false);
     }
   };
 
-  return (
-    <div style={{ animation: "fadeIn 0.3s ease" }}>
-      <h1 style={S.pageTitle}>Documentation (PDCA)</h1>
-      <p style={S.pageSub}>Record and reflect on your Plan-Do-Check-Act cycles for each mentee.</p>
+  const openCheckModal = (cycle) => {
+    setCheckForm({
+      checkFeedback: cycle.checkFeedback || "",
+      checkScore: cycle.checkScore || "",
+      checkStrengths: cycle.checkStrengths || "",
+      checkGaps: cycle.checkGaps || "",
+      checkRecommendations: cycle.checkRecommendations || "",
+      revisionRequired: cycle.revisionRequired || false,
+    });
+    setCheckModal(cycle);
+  };
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-        <SectionCard title="🔄 New PDCA Cycle">
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: 16 }}>
-              <label style={S.label}>Mentee *</label>
-              <select
-                style={{ ...S.input }}
-                value={selectedMenteeId}
-                onChange={e => setSelectedMenteeId(e.target.value)}
-                required
-              >
-                <option value="">Select a mentee...</option>
-                {mentees.map(m => (
-                  <option key={m._id} value={m._id}>{m.name || "Unknown Fellow"}</option>
-                ))}
-              </select>
-              {mentees.length === 0 && (
-                <span style={{ fontSize: 11, color: "#ef4444", marginTop: 4, display: "block" }}>
-                  No mentees assigned yet. Claim a fellow first from Mentee Management.
-                </span>
+  const handleCheckAction = async (isSubmit) => {
+    setSubmitting(true);
+    try {
+      if (isSubmit) {
+        if (!checkForm.checkFeedback) {
+          setToast?.({ msg: "Feedback is required to submit.", type: "error" });
+          setSubmitting(false);
+          return;
+        }
+        await submitPDCACheck(checkModal._id, checkForm);
+        setToast?.({ msg: "Check submitted.", type: "success" });
+      } else {
+        await savePDCACheckDraft(checkModal._id, checkForm);
+        setToast?.({ msg: "Draft saved.", type: "success" });
+      }
+      setCheckModal(null);
+      fetchCycles();
+    } catch (err) {
+      setToast?.({ msg: err.message || "Failed to save check.", type: "error" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    const badges = {
+      DRAFT: { label: "Draft", bg: "#f1f5f9", color: "#475569" },
+      PLAN_PUBLISHED: { label: "Published (Waiting for DO)", bg: "#e0e7ff", color: "#4338ca" },
+      DO_IN_PROGRESS: { label: "Teacher Working", bg: "#fef3c7", color: "#b45309" },
+      DO_SUBMITTED: { label: "Needs Review (CHECK)", bg: "#fef08a", color: "#854d0e" },
+      CHECK_IN_PROGRESS: { label: "Review Draft", bg: "#d1fae5", color: "#059669" },
+      CHECK_COMPLETED: { label: "Reviewed (Waiting for ACT)", bg: "#c7d2fe", color: "#3730a3" },
+      ACT_IN_PROGRESS: { label: "Teacher Acting", bg: "#ede9fe", color: "#5b21b6" },
+      ACT_SUBMITTED: { label: "Act Submitted", bg: "#fce7f3", color: "#be185d" },
+      COMPLETED: { label: "Completed", bg: "#dcfce3", color: "#166534" }
+    };
+    const meta = badges[status] || { label: status, bg: "#eee", color: "#333" };
+    return <span style={{ background: meta.bg, color: meta.color, padding: "4px 10px", borderRadius: 12, fontSize: 11, fontWeight: 700 }}>{meta.label}</span>;
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, paddingBottom: 40 }}>
+      
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "linear-gradient(135deg, #1e293b, #0f172a)", padding: "32px 24px", borderRadius: 20, color: "white", boxShadow: "0 10px 25px rgba(0,0,0,0.15)" }}>
+        <div>
+          <h2 style={{ fontSize: 24, fontWeight: 800, margin: "0 0 8px" }}>PDCA Growth Cycles</h2>
+          <p style={{ margin: 0, opacity: 0.9, fontSize: 14 }}>Structured professional development tracking.</p>
+        </div>
+        <button onClick={() => openPlanModal()} style={{ background: "#4f46e5", color: "white", border: "none", padding: "12px 24px", borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", gap: 8, alignItems: "center" }}>
+          <span>+</span> Create New Plan
+        </button>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {loading ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Loading...</div>
+        ) : cycles.length === 0 ? (
+          <div style={{ padding: 40, textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1", color: "#64748b" }}>
+            No Growth Cycles created yet. Click "Create New Plan" to start.
+          </div>
+        ) : (
+          cycles.map(cycle => (
+            <div key={cycle._id} style={{ background: "white", borderRadius: 16, padding: 24, border: "1px solid #e2e8f0", boxShadow: "0 4px 6px rgba(0,0,0,0.02)" }}>
+              
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <h4 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#0f172a" }}>Cycle {cycle.cycleNumber}: {cycle.planTitle}</h4>
+                  <div style={{ fontSize: 13, color: "#64748b" }}>Mentee: {cycle.menteeId?.name || "Unknown"}</div>
+                </div>
+                <div>{getStatusBadge(cycle.status)}</div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                
+                {/* PLAN BLOCK */}
+                <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, borderLeft: "4px solid #4f46e5" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#4f46e5", textTransform: "uppercase", marginBottom: 8 }}>PLAN</div>
+                  {cycle.status === "DRAFT" ? (
+                    <button onClick={() => openPlanModal(cycle)} style={S.secondaryBtn}>Edit Draft Plan</button>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#334155" }}>
+                      <strong>Objective:</strong> {cycle.planObjective}<br/>
+                      <strong>Target Date:</strong> {cycle.planTargetDate ? new Date(cycle.planTargetDate).toLocaleDateString() : 'N/A'}<br/>
+                      <span style={{ color: "#4f46e5", cursor: "pointer", fontWeight: 600, marginTop: 8, display: "inline-block" }} onClick={() => openPlanModal(cycle)}>View Full Plan</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* DO BLOCK */}
+                <div style={{ background: "#fffbeb", padding: 16, borderRadius: 12, borderLeft: "4px solid #f59e0b" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#b45309", textTransform: "uppercase", marginBottom: 8 }}>DO (Teacher's Work)</div>
+                  {cycle.status === "DO_SUBMITTED" || cycle.status === "CHECK_IN_PROGRESS" || cycle.status === "CHECK_COMPLETED" || cycle.status === "ACT_IN_PROGRESS" || cycle.status === "COMPLETED" ? (
+                    <div style={{ fontSize: 13, color: "#78350f" }}>
+                      <div style={{ whiteSpace: "pre-wrap", maxHeight: 60, overflow: "hidden" }}>{cycle.doActivitiesCompleted}</div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#92400e", fontStyle: "italic" }}>Waiting for submission...</div>
+                  )}
+                </div>
+
+                {/* CHECK BLOCK */}
+                <div style={{ background: "#ecfdf5", padding: 16, borderRadius: 12, borderLeft: "4px solid #10b981" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#047857", textTransform: "uppercase", marginBottom: 8 }}>CHECK (Mentor's Review)</div>
+                  {cycle.status === "DO_SUBMITTED" || cycle.status === "CHECK_IN_PROGRESS" ? (
+                    <button onClick={() => openCheckModal(cycle)} style={{ ...S.primaryBtn, background: "#10b981", fontSize: 12, padding: "8px 16px" }}>Perform Check</button>
+                  ) : cycle.status === "CHECK_COMPLETED" || cycle.status === "ACT_IN_PROGRESS" || cycle.status === "COMPLETED" ? (
+                    <div style={{ fontSize: 13, color: "#065f46" }}>
+                      <strong>Score:</strong> {cycle.checkScore}<br/>
+                      <span style={{ color: "#10b981", cursor: "pointer", fontWeight: 600, marginTop: 8, display: "inline-block" }} onClick={() => openCheckModal(cycle)}>View Review</span>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#065f46", fontStyle: "italic" }}>Awaiting Do submission...</div>
+                  )}
+                </div>
+
+                {/* ACT BLOCK */}
+                <div style={{ background: "#f5f3ff", padding: 16, borderRadius: 12, borderLeft: "4px solid #8b5cf6" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", marginBottom: 8 }}>ACT (Teacher's Response)</div>
+                  {cycle.status === "COMPLETED" || cycle.status === "ACT_SUBMITTED" ? (
+                    <div style={{ fontSize: 13, color: "#4c1d95" }}>
+                      <div style={{ whiteSpace: "pre-wrap", maxHeight: 60, overflow: "hidden" }}>{cycle.actCorrectiveActions}</div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#5b21b6", fontStyle: "italic" }}>Waiting for completion...</div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* PLAN MODAL */}
+      {planModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+          <div style={{ background: "white", borderRadius: 20, padding: 32, width: "100%", maxWidth: 800, maxHeight: "90vh", overflowY: "auto" }}>
+            <h3 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", marginBottom: 24 }}>{planModal === "create" ? "Create Growth Plan" : `Growth Plan: ${planForm.planTitle}`}</h3>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={S.label}>Assigned Mentee *</label>
+                <select style={S.input} value={planForm.menteeId} onChange={e => setPlanForm({...planForm, menteeId: e.target.value})} disabled={planModal !== "create"}>
+                  {mentees.map(m => <option key={m._id} value={m._id}>{m.name}</option>)}
+                </select>
+              </div>
+
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={S.label}>Plan Title *</label>
+                <input style={S.input} type="text" value={planForm.planTitle} onChange={e => setPlanForm({...planForm, planTitle: e.target.value})} />
+              </div>
+
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={S.label}>Objective</label>
+                <textarea style={{ ...S.input, minHeight: 60 }} value={planForm.planObjective} onChange={e => setPlanForm({...planForm, planObjective: e.target.value})} />
+              </div>
+
+              <div>
+                <label style={S.label}>Area of Improvement</label>
+                <input style={S.input} type="text" value={planForm.planArea} onChange={e => setPlanForm({...planForm, planArea: e.target.value})} />
+              </div>
+
+              <div>
+                <label style={S.label}>Expected Outcomes</label>
+                <input style={S.input} type="text" value={planForm.planExpectedOutcomes} onChange={e => setPlanForm({...planForm, planExpectedOutcomes: e.target.value})} />
+              </div>
+
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={S.label}>Planned Activities</label>
+                <textarea style={{ ...S.input, minHeight: 60 }} value={planForm.planActivities} onChange={e => setPlanForm({...planForm, planActivities: e.target.value})} />
+              </div>
+
+              <div>
+                <label style={S.label}>Start Date</label>
+                <input style={S.input} type="date" value={planForm.planStartDate} onChange={e => setPlanForm({...planForm, planStartDate: e.target.value})} />
+              </div>
+
+              <div>
+                <label style={S.label}>Target Completion Date</label>
+                <input style={S.input} type="date" value={planForm.planTargetDate} onChange={e => setPlanForm({...planForm, planTargetDate: e.target.value})} />
+              </div>
+
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 30 }}>
+              <button onClick={() => setPlanModal(null)} style={S.secondaryBtn}>Close</button>
+              {(planModal === "create" || planModal.status === "DRAFT") && (
+                <>
+                  <button onClick={() => handlePlanAction(false)} disabled={submitting} style={S.secondaryBtn}>Save Draft</button>
+                  <button onClick={() => handlePlanAction(true)} disabled={submitting} style={S.primaryBtn}>Publish Plan</button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHECK MODAL */}
+      {checkModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+          <div style={{ background: "white", borderRadius: 20, padding: 32, width: "100%", maxWidth: 800, maxHeight: "90vh", overflowY: "auto" }}>
+            <h3 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}><span style={{background: "#10b981", color: "white", padding: "4px 10px", borderRadius: 8}}>CHECK</span> Perform Review</h3>
+            
+            <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, marginBottom: 20, border: "1px solid #e2e8f0" }}>
+              <strong style={{ fontSize: 12, color: "#475569" }}>TEACHER'S SUBMISSION (DO)</strong>
+              <div style={{ fontSize: 14, color: "#0f172a", marginTop: 8 }}>
+                <strong>Activities Completed:</strong> {checkModal.doActivitiesCompleted || "N/A"}<br/><br/>
+                <strong>Reflections:</strong> {checkModal.doReflections || "N/A"}<br/><br/>
+                <strong>Evidence URLs:</strong> {checkModal.doEvidence?.join(', ') || "None"}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={S.label}>Feedback / Observations *</label>
+                <textarea style={{ ...S.input, minHeight: 80, borderColor: "#10b981" }} value={checkForm.checkFeedback} onChange={e => setCheckForm({...checkForm, checkFeedback: e.target.value})} disabled={checkModal.status !== "DO_SUBMITTED" && checkModal.status !== "CHECK_IN_PROGRESS"} />
+              </div>
+
+              <div>
+                <label style={S.label}>Strengths</label>
+                <input style={S.input} type="text" value={checkForm.checkStrengths} onChange={e => setCheckForm({...checkForm, checkStrengths: e.target.value})} disabled={checkModal.status !== "DO_SUBMITTED" && checkModal.status !== "CHECK_IN_PROGRESS"} />
+              </div>
+
+              <div>
+                <label style={S.label}>Gaps / Areas for Improvement</label>
+                <input style={S.input} type="text" value={checkForm.checkGaps} onChange={e => setCheckForm({...checkForm, checkGaps: e.target.value})} disabled={checkModal.status !== "DO_SUBMITTED" && checkModal.status !== "CHECK_IN_PROGRESS"} />
+              </div>
+
+              <div>
+                <label style={S.label}>Score / Rating</label>
+                <input style={S.input} type="text" value={checkForm.checkScore} onChange={e => setCheckForm({...checkForm, checkScore: e.target.value})} placeholder="e.g. 4/5 or Good" disabled={checkModal.status !== "DO_SUBMITTED" && checkModal.status !== "CHECK_IN_PROGRESS"} />
+              </div>
+
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={S.label}>Recommendations</label>
+                <textarea style={{ ...S.input, minHeight: 60 }} value={checkForm.checkRecommendations} onChange={e => setCheckForm({...checkForm, checkRecommendations: e.target.value})} disabled={checkModal.status !== "DO_SUBMITTED" && checkModal.status !== "CHECK_IN_PROGRESS"} />
+              </div>
+
+              {(checkModal.status === "DO_SUBMITTED" || checkModal.status === "CHECK_IN_PROGRESS") && (
+                <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10, background: "#fef2f2", padding: 16, borderRadius: 12, border: "1px solid #fecaca" }}>
+                  <input type="checkbox" id="revisionRequired" checked={checkForm.revisionRequired} onChange={e => setCheckForm({...checkForm, revisionRequired: e.target.checked})} style={{ width: 18, height: 18, accentColor: "#dc2626" }} />
+                  <label htmlFor="revisionRequired" style={{ fontSize: 14, color: "#991b1b", fontWeight: 700, cursor: "pointer", margin: 0 }}>
+                    Revision Required (Send cycle back to Teacher's DO phase)
+                  </label>
+                </div>
               )}
             </div>
 
-            <div style={{ marginBottom: 16 }}>
-              <label style={{...S.label, display: "flex", alignItems: "center", gap: 6}}>
-                <span style={{background: "#e0e7ff", color: "#4f46e5", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 900}}>P</span>
-                PLAN (Objective & Strategy)
-              </label>
-              <textarea style={{...S.input, minHeight: 60}} value={pdcaForm.plan} onChange={e=>setPdcaForm({...pdcaForm, plan: e.target.value})} placeholder="What is the goal? What is the plan?" required />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
+              <button onClick={() => setCheckModal(null)} style={S.secondaryBtn}>Close</button>
+              {(checkModal.status === "DO_SUBMITTED" || checkModal.status === "CHECK_IN_PROGRESS") && (
+                <>
+                  <button onClick={() => handleCheckAction(false)} disabled={submitting} style={S.secondaryBtn}>Save Draft</button>
+                  <button onClick={() => handleCheckAction(true)} disabled={submitting} style={{ ...S.primaryBtn, background: "#10b981" }}>Submit Review</button>
+                </>
+              )}
             </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{...S.label, display: "flex", alignItems: "center", gap: 6}}>
-                <span style={{background: "#fef3c7", color: "#d97706", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 900}}>D</span>
-                DO (Action Taken)
-              </label>
-              <textarea style={{...S.input, minHeight: 60}} value={pdcaForm.do} onChange={e=>setPdcaForm({...pdcaForm, do: e.target.value})} placeholder="How was the plan executed?" required />
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{...S.label, display: "flex", alignItems: "center", gap: 6}}>
-                <span style={{background: "#d1fae5", color: "#059669", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 900}}>C</span>
-                CHECK (Results & Observations)
-              </label>
-              <textarea style={{...S.input, minHeight: 60}} value={pdcaForm.check} onChange={e=>setPdcaForm({...pdcaForm, check: e.target.value})} placeholder="What were the outcomes? What worked well?" required />
-            </div>
-
-            <div style={{ marginBottom: 24 }}>
-              <label style={{...S.label, display: "flex", alignItems: "center", gap: 6}}>
-                <span style={{background: "#fee2e2", color: "#dc2626", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 900}}>A</span>
-                ACT (Next Steps & Adjustments)
-              </label>
-              <textarea style={{...S.input, minHeight: 60}} value={pdcaForm.act} onChange={e=>setPdcaForm({...pdcaForm, act: e.target.value})} placeholder="What changes will you make for the next cycle?" required />
-            </div>
-
-            <button type="submit" disabled={submitting || !selectedMenteeId} style={{...S.primaryBtn, width: "100%", opacity: (submitting || !selectedMenteeId) ? 0.7 : 1}}>
-              {submitting ? "Saving..." : "Save PDCA Cycle"}
-            </button>
-          </form>
-        </SectionCard>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <SectionCard title="📚 PDCA History">
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {history.length === 0 ? (
-                <div style={{ padding: 20, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>No PDCA cycles recorded yet.</div>
-              ) : history.map((item, i) => (
-                <div key={item._id || i} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#3b82f6" }}>{item.menteeId?.name || "Unknown Mentee"}</div>
-                    <div style={{ fontSize: 10, fontWeight: 800, background: "#d1fae5", color: "#059669", padding: "2px 8px", borderRadius: 10 }}>{item.status || "Completed"}</div>
-                  </div>
-                  <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
-                    {item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-US", { month:"short", day:"2-digit", year:"numeric" }) : ""}
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 8 }}>{item.plan.substring(0, 60) + (item.plan.length > 60 ? "..." : "")}</div>
-                  <button onClick={() => setToast?.({ msg: `Mentee: ${item.menteeId?.name || "Unknown"}\nPlan: ${item.plan}\nDo: ${item.do}\nCheck: ${item.check}\nAct: ${item.act}`, type: "info" })} style={{ background: "none", border: "none", color: "#3b82f6", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0 }}>View Full Cycle →</button>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard title="💡 PDCA Tips">
-            <ul style={{ paddingLeft: 20, margin: 0, color: "#475569", fontSize: 13, lineHeight: 1.6 }}>
-              <li style={{marginBottom: 8}}>Keep objectives SMART (Specific, Measurable, Achievable, Relevant, Time-bound).</li>
-              <li style={{marginBottom: 8}}>Document data and specific observations in the <strong>Check</strong> phase.</li>
-              <li>Use the <strong>Act</strong> phase to refine your strategy for the next iteration.</li>
-            </ul>
-          </SectionCard>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

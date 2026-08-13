@@ -37,14 +37,29 @@ export default function MentorCurriculumTab({ user, setToast }) {
   const [advanceSourcePhase, setAdvanceSourcePhase] = useState(null);
   const [advanceTargetPhase, setAdvanceTargetPhase] = useState(null);
   const [fellowProgressList, setFellowProgressList] = useState([]);
-  const [advanceSelectedFellowIds, setAdvanceSelectedFellowIds] = useState([]);
+  const [assignments, setAssignments] = useState([]);
 
   const token = localStorage.getItem("spaceece_auth_token");
 
   useEffect(() => {
     fetchPlans();
     fetchMentees();
+    fetchAssignments();
   }, []);
+
+  const fetchAssignments = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/mentor/curriculum/assignments`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAssignments(data || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch curriculum assignments", err);
+    }
+  };
 
   const fetchPlans = async () => {
     setLoading(true);
@@ -331,6 +346,7 @@ export default function MentorCurriculumTab({ user, setToast }) {
       }
       setToast?.({ msg: `Plan assigned to ${selectedFellowIds.length} mentees!`, type: "success" });
       setShowAssignModal(false);
+      await fetchAssignments();
     } catch (err) {
       setToast?.({ msg: "Failed to assign plan", type: "error" });
     }
@@ -681,6 +697,101 @@ export default function MentorCurriculumTab({ user, setToast }) {
               })}
             </div>
           )}
+
+          {/* Assigned Fellows Progress Tracker Roster */}
+          <div style={{ marginTop: 32, background: "#ffffff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 20, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#0f172a" }}>📊 Assigned Mentees Curriculum Progress</h3>
+                <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>Track real-time curriculum completion & active phase for assigned fellows.</p>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, background: "#eff6ff", color: "#2563eb", padding: "4px 10px", borderRadius: 6 }}>
+                Total Assignments: {assignments.length}
+              </span>
+            </div>
+
+            {assignments.length === 0 ? (
+              <div style={{ padding: 24, textAlign: "center", color: "#64748b", fontSize: 13, background: "#f8fafc", borderRadius: 8, border: "1px dashed #cbd5e1" }}>
+                No fellows assigned to any curriculum plan yet. Select a plan above and click <strong>👥 Assign</strong> to enroll fellows.
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, textAlign: "left" }}>
+                  <thead>
+                    <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", color: "#475569", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      <th style={{ padding: "10px 12px", borderRadius: "6px 0 0 6px" }}>Teacher / Fellow</th>
+                      <th style={{ padding: "10px 12px" }}>Assigned Curriculum</th>
+                      <th style={{ padding: "10px 12px" }}>Active Phase / Semester</th>
+                      <th style={{ padding: "10px 12px" }}>Progress</th>
+                      <th style={{ padding: "10px 12px" }}>Status</th>
+                      <th style={{ padding: "10px 12px", borderRadius: "0 6px 6px 0", textAlign: "right" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assignments.map(assign => {
+                      const fellowName = assign.fellow?.name || "Teacher/Fellow";
+                      const fellowEmail = assign.fellow?.email || "";
+                      const planTitle = assign.plan?.title || "Curriculum Framework";
+                      const phaseTitle = assign.activePhase ? `${assign.activePhase.semester}: ${assign.activePhase.title}` : "Semester 1 (Active)";
+                      const pct = assign.progressPercent || 0;
+                      const completedCount = (assign.completedItems || []).length;
+
+                      return (
+                        <tr key={assign._id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "12px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#0f172a", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13 }}>
+                                {fellowName[0]?.toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 800, color: "#0f172a" }}>{fellowName}</div>
+                                <div style={{ fontSize: 11, color: "#64748b" }}>{fellowEmail}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: "12px", fontWeight: 700, color: "#1e293b" }}>{planTitle}</td>
+                          <td style={{ padding: "12px" }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, background: "#f1f5f9", color: "#475569", padding: "3px 8px", borderRadius: 4 }}>
+                              {phaseTitle}
+                            </span>
+                          </td>
+                          <td style={{ padding: "12px", width: 180 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ flex: 1, height: 7, background: "#e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+                                <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "#059669" : "#2563eb", borderRadius: 10, transition: "width 0.3s" }} />
+                              </div>
+                              <span style={{ fontSize: 12, fontWeight: 800, color: "#0f172a", width: 38 }}>{pct}%</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{completedCount} items completed</div>
+                          </td>
+                          <td style={{ padding: "12px" }}>
+                            <span style={{ fontSize: 11, fontWeight: 800, background: pct >= 100 ? "#d1fae5" : "#eff6ff", color: pct >= 100 ? "#047857" : "#1d4ed8", padding: "2px 8px", borderRadius: 4 }}>
+                              {pct >= 100 ? "✓ Completed" : "● Active"}
+                            </span>
+                          </td>
+                          <td style={{ padding: "12px", textAlign: "right" }}>
+                            <button
+                              onClick={() => {
+                                const targetPlan = plans.find(p => p._id === assign.plan?._id);
+                                if (targetPlan) {
+                                  setActivePlan(targetPlan);
+                                  setSelectedFellowIds((targetPlan.assignedFellows || []).map(f => typeof f === "object" ? f._id : f));
+                                  setShowAssignModal(true);
+                                }
+                              }}
+                              style={{ padding: "5px 10px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", color: "#0f172a" }}
+                            >
+                              ⚙️ Manage Assignment
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

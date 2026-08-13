@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+�import { useState, useEffect, useRef } from "react";
 import { Logo, Toast, Badge, StatusBadge, StatCard, SectionCard, S, globalCSS } from "../components/Shared";
 import { t, setLanguage, getLanguageList, getCurrentLanguage, LANG_CHANGE_EVENT, getCurrentLanguageCode } from "../services/i18n";
 // Start: Snehal change
@@ -8,13 +8,15 @@ import AttendanceManager from "./AttendanceManager";
 import TrainingAndClassroomManager from "./TrainingAndClassroomManager";
 import GeotagAttendance from "./GeotagAttendance";
 import ProctoredAssessment from "./Proctoredassessment";      // now reading/notes based, same filename
-import TeacherCourseNotes from "./TeacherCourseNotes";    // NEW — replaces the old video CoursesTab
+import TeacherCourseNotes from "./TeacherCourseNotes";    // NEW â��⬝ replaces the old video CoursesTab
 import LessonPlannerTab from "./LessonPlannerTab";     
 import TeacherUserGuide from "./teacheruserguide";
 import CurriculumTab from "./CurriculumTab";
-import GrowthCycleTab from "./GrowthCycleTab";
 import {
   getTeacherProgress,
+  getMyPDCACycles,
+  submitPDCADo,
+  submitPDCAAct,
   getNotifications,
   markNotificationRead,
   askTeacherChatbot,
@@ -51,7 +53,7 @@ const getTeacherPhotoUrl = (teacher) => {
   return url || null;
 };
 
-/* ── Sidebar Avatar Component ── */
+/* â⬝��â⬝�� Sidebar Avatar Component â⬝��â⬝�� */
 function SidebarAvatar({ teacher, size = 34 }) {
   const [imgError, setImgError] = useState(false);
   const photoUrl = getTeacherPhotoUrl(teacher);
@@ -68,12 +70,12 @@ function SidebarAvatar({ teacher, size = 34 }) {
     <div style={{ position: "relative", flexShrink: 0 }}>
       <img src={photoUrl} alt={teacher?.name} onError={() => setImgError(true)}
         style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "2px solid #e2e8f0" }} />
-      <span style={{ position: "absolute", bottom: 0, right: 0, background: "#10b981", borderRadius: "50%", width: 12, height: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, border: "1.5px solid white" }}>📷</span>
+      <span style={{ position: "absolute", bottom: 0, right: 0, background: "#10b981", borderRadius: "50%", width: 12, height: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, border: "1.5px solid white" }}>ðŸ�S·</span>
     </div>
   );
 }
 
-/* ── Mentor Avatar for My Mentor section — resolves photo from any format ── */
+/* â⬝��â⬝�� Mentor Avatar for My Mentor section â��⬝ resolves photo from any format â⬝��â⬝�� */
 function MentorAvatarInline({ mentor, size = 48 }) {
   const [imgError, setImgError] = useState(false);
 
@@ -102,7 +104,7 @@ function MentorAvatarInline({ mentor, size = 48 }) {
         fontSize: size * 0.4, fontWeight: 800, color: "white", flexShrink: 0,
         border: "2px solid #bfdbfe"
       }}>
-        {mentor?.name?.[0]?.toUpperCase() || "👨‍🏫"}
+        {mentor?.name?.[0]?.toUpperCase() || "ðŸ��¨â��ðŸ«"}
       </div>
     );
   }
@@ -122,8 +124,8 @@ function MentorAvatarInline({ mentor, size = 48 }) {
   );
 }
 
-/* ── Under Construction Placeholder ── */
-function UnderConstructionTab({ label = "This page", icon = "🚧" }) {
+/* â⬝��â⬝�� Under Construction Placeholder â⬝��â⬝�� */
+function UnderConstructionTab({ label = "This page", icon = "ðŸš§" }) {
   return (
     <div style={{ animation: "fadeIn 0.3s ease", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
       <div style={{
@@ -140,14 +142,14 @@ function UnderConstructionTab({ label = "This page", icon = "🚧" }) {
           {label} is under work
         </div>
         <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>
-          This section is currently being built and is not connected yet. Please check back soon — thank you for your patience!
+          This section is currently being built and is not connected yet. Please check back soon â��⬝ thank you for your patience!
         </div>
       </div>
     </div>
   );
 }
 
-/* ── OverviewTab ── */
+/* â⬝��â⬝�� OverviewTab â⬝��â⬝�� */
 function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lessons = [], activities = [], summary = {} }) {
   const attendance = summary.attendanceRate !== undefined ? summary.attendanceRate : 0;
   const attColor   = attendance>=85 ? "#10b981" : attendance>=70 ? "#f59e0b" : "#ef4444";
@@ -199,7 +201,7 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
               <span style={{ fontSize: 22, fontWeight: 800, color: "white" }}>{user.name?.[0] || "?"}</span>
             )}
           </div>
-          {photoUrl && <span style={{ position: "absolute", bottom: 0, right: 0, background: "#10b981", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, border: "2px solid white" }}>📷</span>}
+          {photoUrl && <span style={{ position: "absolute", bottom: 0, right: 0, background: "#10b981", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, border: "2px solid white" }}>ðŸ�S·</span>}
         </div>
       </div>
 
@@ -208,11 +210,11 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
         <span>Working Center: {centerName}</span>
       </div>
 
-      {/* ── My Mentor Section ── */}
+      {/* â⬝��â⬝�� My Mentor Section â⬝��â⬝�� */}
       {(user.role === 'teacher' || user.role === 'fellow') && (
         <div style={{ marginBottom: 20, marginTop: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1917", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 18 }}>🎓</span> My Mentor
+            <span style={{ fontSize: 18 }}>ðŸŽ�S</span> My Mentor
           </div>
           
           {user.assignedMentor ? (
@@ -226,19 +228,19 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
                 <div>
                   <h4 style={{ margin: "0 0 4px", fontSize: 16, color: "#1e293b" }}>{user.assignedMentor.name}</h4>
                   <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span>✉️ {user.assignedMentor.email}</span>
+                    <span>â�⬰ï¸ {user.assignedMentor.email}</span>
                   </div>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
                 <a href={`mailto:${user.assignedMentor.email}`} style={{ padding: "8px 12px", background: "#f8fafc", color: "#334155", borderRadius: 8, textDecoration: "none", fontSize: 12, fontWeight: 600, border: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: 6 }}>
-                  ✉️ Message
+                  â�⬰ï¸ Message
                 </a>
               </div>
             </div>
           ) : (
             <div style={{ background: "#f8fafc", padding: "16px", borderRadius: 14, border: "1px dashed #cbd5e1", display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>⏳</div>
+              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>â³</div>
               <div>
                 <h4 style={{ margin: "0 0 4px", fontSize: 14, color: "#334155" }}>Pending Mentor Assignment</h4>
                 <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>An admin or mentor will review your profile and claim you as a mentee shortly.</p>
@@ -248,10 +250,10 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
         </div>
       )}
 
-      {/* ── My Assigned Class Section ── */}
+      {/* â⬝��â⬝�� My Assigned Class Section â⬝��â⬝�� */}
       <div style={{ marginBottom: 20, marginTop: 20 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1917", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 18 }}>📚</span> My Assigned Class
+          <span style={{ fontSize: 18 }}>ðŸ�Sš</span> My Assigned Class
         </div>
         
         {allAssignedClasses.length > 0 ? (
@@ -268,7 +270,7 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
                     background: "linear-gradient(135deg,#fef3c7,#fbbf24)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 18, flexShrink: 0
-                  }}>🏫</div>
+                  }}>ðŸ«</div>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: "#1c1917" }}>{cls?.name || "Unknown Class"}</div>
                     {cls?.ageGroup && <div style={{ fontSize: 11, color: "#6b7280" }}>Age: {cls.ageGroup}</div>}
@@ -277,16 +279,16 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {cls?.curriculumLevel && (
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#374151" }}>
-                      <span style={{ color: "#f59e0b" }}>📚</span> {cls.curriculumLevel}
+                      <span style={{ color: "#f59e0b" }}>ðŸ�Sš</span> {cls.curriculumLevel}
                     </div>
                   )}
                   {cls?.schedule && (
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#374151" }}>
-                      <span style={{ color: "#f59e0b" }}>⏰</span> {cls.schedule}
+                      <span style={{ color: "#f59e0b" }}>â°</span> {cls.schedule}
                     </div>
                   )}
                   <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#374151" }}>
-                    <span style={{ color: "#f59e0b" }}>🏫</span> {centerName}
+                    <span style={{ color: "#f59e0b" }}>ðŸ«</span> {centerName}
                   </div>
                 </div>
               </div>
@@ -297,7 +299,7 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
             background: "white", borderRadius: 14, padding: "24px",
             border: "1px solid #e5e7eb", textAlign: "center"
           }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>ðŸ�S⬹</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "#6b7280" }}>No class assigned yet</div>
             <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Contact admin to assign you to a class</div>
           </div>
@@ -326,14 +328,14 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
         return (
           <div style={{ background: "linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)", borderRadius: 16, border: "1px solid #fcd34d", padding: 20, marginBottom: 20 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <span style={{ fontSize: 20 }}>📋</span>
+              <span style={{ fontSize: 20 }}>ðŸ�S⬹</span>
               <span style={{ fontSize: 16, fontWeight: 800, color: "#92400e" }}>Today's Activities</span>
               <span style={{ fontSize: 12, color: "#b45309", fontWeight: 600 }}>{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {todayLessons.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 8 }}>📚 Lessons Today ({todayLessons.length})</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 8 }}>ðŸ�Sš Lessons Today ({todayLessons.length})</div>
                   {todayLessons.map((l, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "white", borderRadius: 8, marginBottom: 6, border: "1px solid #fde68a" }}>
                       <div style={{ width: 6, height: 6, borderRadius: "50%", background: l.status === "completed" ? "#10b981" : "#f59e0b", flexShrink: 0 }} />
@@ -348,7 +350,7 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
               {todayAssignments.length > 0 && (
                 <div>
                   {/* Start: Dnyaneshwari Thorat */}
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 8 }}>📘 Assigned Courses ({todayAssignments.length})</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 8 }}>ðŸ�S�S Assigned Courses ({todayAssignments.length})</div>
                   {/* End: Dnyaneshwari Thorat */}
                   {todayAssignments.map((a, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "white", borderRadius: 8, marginBottom: 6, border: "1px solid #fde68a" }}>
@@ -387,7 +389,7 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
                   const textColor = isNull ? "#9ca3af" : val >= 90 ? "#10b981" : val >= 80 ? "#f59e0b" : "#ef4444";
                   return (
                     <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
-                      <span style={{ marginBottom: 8, fontSize: 12, fontWeight: 800, color: textColor }}>{isNull ? "—" : `${val}%`}</span>
+                      <span style={{ marginBottom: 8, fontSize: 12, fontWeight: 800, color: textColor }}>{isNull ? "â��⬝" : `${val}%`}</span>
                       <div style={{ width: 32, height: `${barH}px`, minHeight: isNull ? 0 : 6, borderRadius: "8px 8px 0 0", background: barColor, transition: "all .6s ease" }} />
                       <span style={{ marginTop: 10, fontSize: 10, fontWeight: 700, color: "#6b7280" }}>{d.label}</span>
                     </div>
@@ -418,12 +420,12 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
                   <div style={{ height: 6, background: "#f3f4f6", borderRadius: 4, overflow: "hidden", marginBottom: 2 }}>
                     <div style={{ height: "100%", width: `${progress}%`, background: "linear-gradient(90deg,#f59e0b,#d97706)", borderRadius: 4 }}/>
                   </div>
-                  <div style={{ fontSize: 10, color: "#9ca3af" }}>{c.status || "Assigned"} · Due: {c.dueDate ? new Date(c.dueDate).toLocaleDateString() : "No deadline"}</div>
+                  <div style={{ fontSize: 10, color: "#9ca3af" }}>{c.status || "Assigned"} �· Due: {c.dueDate ? new Date(c.dueDate).toLocaleDateString() : "No deadline"}</div>
                 </div>
               );
             })
           )}
-          <button onClick={()=>setActiveTab("courses")} style={{ fontSize: 12, color: "#d97706", fontWeight: 700, background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 4 }}>View all courses →</button>
+          <button onClick={()=>setActiveTab("courses")} style={{ fontSize: 12, color: "#d97706", fontWeight: 700, background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 4 }}>View all courses â⬠�"</button>
         </SectionCard>
       </div>
 
@@ -464,7 +466,7 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
               </div>
             ))
           )}
-          <button onClick={()=>setActiveTab("assignments")} style={{ fontSize: 12, color: "#d97706", fontWeight: 700, background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 8 }}>View all →</button>
+          <button onClick={()=>setActiveTab("assignments")} style={{ fontSize: 12, color: "#d97706", fontWeight: 700, background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 8 }}>View all â⬠�"</button>
         </SectionCard>
       </div>
     </div>
@@ -474,7 +476,7 @@ function OverviewTab({ user, setActiveTab, courses = [], assignments = [], lesso
 /* NOTE: the old video-based `getCourseContent()` helper and `CoursesTab`
    component that used to live here have been removed. Course content is
    now topic-wise reading notes (no video), rendered by the imported
-   `TeacherCourseNotes` component — see the "courses" case in
+   `TeacherCourseNotes` component â��⬝ see the "courses" case in
    renderContent() below. */
 
 const formatTeacherDate = (value, options = {}) => {
@@ -520,11 +522,11 @@ function ScheduleTab({ user, lessons = [] }) {
   return (
     <div style={{ animation: "fadeIn 0.3s ease" }}>
       <h1 style={S.pageTitle}>Schedule</h1>
-      <p style={S.pageSub}>Subject: {user.subject || user.teacherProfile?.subject || "Assigned teacher"} · {classNames.length > 0 ? classNames.join(", ") : "Class not assigned"}</p>
+      <p style={S.pageSub}>Subject: {user.subject || user.teacherProfile?.subject || "Assigned teacher"} �· {classNames.length > 0 ? classNames.join(", ") : "Class not assigned"}</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 16, marginBottom: 20 }}>
-        <StatCard icon="📅" label="Scheduled Lessons" val={items.length} color="#3b82f6" bg="#dbeafe" />
-        <StatCard icon="⏳" label="Upcoming" val={upcoming.length} color="#f59e0b" bg="#fef3c7" />
-        <StatCard icon="✅" label="Completed" val={completed} color="#10b981" bg="#d1fae5" />
+        <StatCard icon="ðŸ�S⬦" label="Scheduled Lessons" val={items.length} color="#3b82f6" bg="#dbeafe" />
+        <StatCard icon="â³" label="Upcoming" val={upcoming.length} color="#f59e0b" bg="#fef3c7" />
+        <StatCard icon="â�⬦" label="Completed" val={completed} color="#10b981" bg="#d1fae5" />
       </div>
       <SectionCard title="Assigned Lesson Schedule">
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -575,8 +577,8 @@ function GradesTab({ assignments = [] }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))", gap: 16, marginBottom: 20 }}>
         <StatCard icon="%" label={t("Average Score")} val={graded.length ? average + "%" : "--"} color="#8b5cf6" bg="#ede9fe" />
         <StatCard icon="#" label={t("Reviewed Assignments")} val={graded.length} color="#10b981" bg="#d1fae5" />
-        <StatCard icon="★" label={t("Best Score")} val={graded.length ? topScore + "%" : "--"} color="#f59e0b" bg="#fef3c7" />
-        <StatCard icon="↻" label={t("Needs Revision")} val={revisions} color="#ef4444" bg="#fee2e2" />
+        <StatCard icon="â�S⬦" label={t("Best Score")} val={graded.length ? topScore + "%" : "--"} color="#f59e0b" bg="#fef3c7" />
+        <StatCard icon="â⬠»" label={t("Needs Revision")} val={revisions} color="#ef4444" bg="#fee2e2" />
       </div>
       <SectionCard title={t("Reviewed Work")}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -695,14 +697,14 @@ function AssignmentsTab({ assignments = [], onSubmitAssignment }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
           <h1 style={S.pageTitle}>My Assignments</h1>
-          <p style={S.pageSub}>{pendingCount} assigned · {revisionCount} needs revision</p>
+          <p style={S.pageSub}>{pendingCount} assigned �· {revisionCount} needs revision</p>
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 16, marginBottom: 18 }}>
-        <StatCard icon="✏️" label="To Submit" val={pendingCount + revisionCount} color="#f59e0b" bg="#fef3c7" />
-        <StatCard icon="📤" label="Submitted" val={submittedCount} color="#3b82f6" bg="#dbeafe" />
-        <StatCard icon="✅" label="Reviewed" val={reviewedCount} color="#10b981" bg="#d1fae5" />
+        <StatCard icon="â�ï¸" label="To Submit" val={pendingCount + revisionCount} color="#f59e0b" bg="#fef3c7" />
+        <StatCard icon="ðŸ�S¤" label="Submitted" val={submittedCount} color="#3b82f6" bg="#dbeafe" />
+        <StatCard icon="â�⬦" label="Reviewed" val={reviewedCount} color="#10b981" bg="#d1fae5" />
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
         {filterBtn("all", "All")}
@@ -720,10 +722,10 @@ function AssignmentsTab({ assignments = [], onSubmitAssignment }) {
           visibleAssignments.map(a => (
             <div key={a._id} style={{ background: "white", borderRadius: 14, padding: "16px 20px", border: "1px solid #f1f5f9", boxShadow: "0 1px 4px rgba(0,0,0,0.04)", borderLeft: `4px solid ${a.status==="approved"||a.status==="reviewed"?"#10b981":a.status==="revision"?"#ef4444":"#f59e0b"}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ fontSize: 24 }}>{a.status==="approved"||a.status==="reviewed"?"✅":a.status==="revision"?"🔁":"📝"}</div>
+                <div style={{ fontSize: 24 }}>{a.status==="approved"||a.status==="reviewed"?"â�⬦":a.status==="revision"?"ðŸ⬝":"ðŸ�S"}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1917" }}>{getAssignmentTitle(a)}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{a.course?.title} · Due: {a.dueDate ? new Date(a.dueDate).toLocaleDateString() : "No deadline"}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{a.course?.title} �· Due: {a.dueDate ? new Date(a.dueDate).toLocaleDateString() : "No deadline"}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   {a.score !== null && a.score !== undefined && <span style={{ fontSize: 16, fontWeight: 800, color: "#10b981" }}>{a.score}/{a.assessmentTotal !== undefined && a.assessmentTotal !== null ? a.assessmentTotal : 100}</span>}
@@ -744,12 +746,12 @@ function AssignmentsTab({ assignments = [], onSubmitAssignment }) {
               </div>
               {a.status==="revision" && a.feedback && (
                 <div style={{ marginTop: 10, padding: "8px 12px", background: "#fef2f2", borderRadius: 8, fontSize: 12, color: "#991b1b" }}>
-                  ⚠️ Revision required. Admin feedback: <b>{a.feedback}</b>
+                  âš ï¸ Revision required. Admin feedback: <b>{a.feedback}</b>
                 </div>
               )}
               {a.status==="approved" && a.feedback && (
                 <div style={{ marginTop: 10, padding: "8px 12px", background: "#f0fdf4", borderRadius: 8, fontSize: 12, color: "#166534" }}>
-                  ✓ Feedback: <b>{a.feedback}</b>
+                  â��S Feedback: <b>{a.feedback}</b>
                 </div>
               )}
             </div>
@@ -762,17 +764,17 @@ function AssignmentsTab({ assignments = [], onSubmitAssignment }) {
           <div style={{ background: "white", borderRadius: 20, padding: "28px", width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h3 style={{ fontSize: 17, fontWeight: 800, color: "#1c1917", margin: 0 }}>Submit Assignment</h3>
-              <button onClick={handleCloseModal} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af" }}>✕</button>
+              <button onClick={handleCloseModal} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af" }}>â�⬢</button>
             </div>
             <label style={S.label}>Assignment Title</label>
             <input style={{ ...S.input, marginBottom: 12 }} value={title} onChange={e => setTitle(e.target.value)} placeholder="Enter assignment title"/>
             <label style={S.label}>Upload File</label>
             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.docx,.ppt,.pptx" style={{ display: "none" }}/>
             <div onClick={()=>fileInputRef.current?.click()} style={{ border: "2px dashed #fbbf24", borderRadius: 12, padding: "24px", textAlign: "center", marginBottom: 16, background: "#fffbeb", cursor: "pointer" }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📎</div>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>ðŸ�SŽ</div>
               {selectedFile ? (
                 <>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#059669" }}>📄 File Added Successfully!</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#059669" }}>ðŸ�S�~ File Added Successfully!</div>
                   <div style={{ fontSize: 12, color: "#374151", marginTop: 4, fontWeight: 600, wordBreak: "break-all" }}>{selectedFile.name}</div>
                   <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>Size: {selectedFile.size}</div>
                 </>
@@ -786,7 +788,7 @@ function AssignmentsTab({ assignments = [], onSubmitAssignment }) {
             <label style={S.label}>Notes (Optional)</label>
             <textarea style={{ ...S.input, height: 70, resize: "none", marginBottom: 20 }} value={note} onChange={e => setNote(e.target.value)} placeholder="Any notes for the reviewer..."/>
             <button onClick={handleSubmit} disabled={submitting} style={{ ...S.primaryBtn, width: "100%" }}>
-              {submitting ? "Uploading & Submitting..." : "📤 Submit Assignment"}
+              {submitting ? "Uploading & Submitting..." : "ðŸ�S¤ Submit Assignment"}
             </button>
           </div>
         </div>
@@ -837,13 +839,13 @@ function CertificatesTab({ assignments = [], certificates: certs = [] }) {
                     onClick={() => viewCertificatePdf(item._id)}
                     style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid #d97706", background: "white", color: "#d97706", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
                   >
-                    👁️ View Certificate
+                    ðŸ��ï¸ View Certificate
                   </button>
                   <button
                     onClick={() => downloadCertificatePdf(item._id, `Certificate-${item.certificateNumber}.pdf`)}
                     style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "white", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
                   >
-                    ⬇️ Download
+                    â¬⬡ï¸ Download
                   </button>
                 </div>
               )}
@@ -856,9 +858,9 @@ function CertificatesTab({ assignments = [], certificates: certs = [] }) {
   );
 }
 
-/* ─────────────────────────────────────────
+/* â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��
    PROFILE TAB  (Complete Implementation)
-───────────────────────────────────────── */
+â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝�� */
 function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1060,20 +1062,20 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {editing && (
-            <button onClick={handleCancel} style={S.exportBtn} disabled={saving}>✕ Cancel</button>
+            <button onClick={handleCancel} style={S.exportBtn} disabled={saving}>â�⬢ Cancel</button>
           )}
           <button
             onClick={editing ? handleSave : () => setEditing(true)}
             style={editing ? { ...S.primaryBtn, background: "linear-gradient(135deg,#10b981,#059669)", opacity: saving ? 0.7 : 1 } : S.primaryBtn}
             disabled={saving}
           >
-            {editing ? (saving ? "💾 Saving..." : "💾 Save Changes") : "✏️ Edit Profile"}
+            {editing ? (saving ? "ðŸ�"¾ Saving..." : "ðŸ�"¾ Save Changes") : "â�ï¸ Edit Profile"}
           </button>
         </div>
       </div>
 
       <div style={{ background: "white", borderRadius: 20, padding: "28px", border: "1px solid #f1f5f9", boxShadow: "0 4px 20px rgba(0,0,0,0.06)", marginBottom: 20 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#1c1917", margin: "0 0 16px" }}>📷 Profile Picture</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#1c1917", margin: "0 0 16px" }}>ðŸ�S· Profile Picture</h3>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <div style={{ position: "relative" }}>
             {profilePhoto && !imageLoadError ? (
@@ -1101,7 +1103,7 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
               style={{ position: "absolute", bottom: 0, right: 0, width: 32, height: 32, borderRadius: "50%", background: "#f59e0b", border: "2px solid white", color: "white", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
               disabled={uploadingPhoto}
             >
-              {uploadingPhoto ? "⏳" : "📷"}
+              {uploadingPhoto ? "â³" : "ðŸ�S·"}
             </button>
             <input
               type="file"
@@ -1128,7 +1130,7 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
       </div>
 
       <div style={{ background: "white", borderRadius: 20, padding: "28px", border: "1px solid #f1f5f9", boxShadow: "0 4px 20px rgba(0,0,0,0.06)", marginBottom: 20 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#1c1917", margin: "0 0 16px" }}>👤 Personal Information</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#1c1917", margin: "0 0 16px" }}>ðŸ��¤ Personal Information</h3>
         
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
           <div>
@@ -1195,7 +1197,7 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
       </div>
 
       <div style={{ background: "white", borderRadius: 20, padding: "28px", border: "1px solid #f1f5f9", boxShadow: "0 4px 20px rgba(0,0,0,0.06)", marginBottom: 20 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#1c1917", margin: "0 0 16px" }}>💼 Professional Information</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#1c1917", margin: "0 0 16px" }}>ðŸ�"¼ Professional Information</h3>
         
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
           <div>
@@ -1235,7 +1237,7 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
       </div>
 
       <div style={{ background: "white", borderRadius: 20, padding: "28px", border: "1px solid #f1f5f9", boxShadow: "0 4px 20px rgba(0,0,0,0.06)", marginBottom: 20 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#1c1917", margin: "0 0 16px" }}>🔐 Account Information</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#1c1917", margin: "0 0 16px" }}>ðŸ⬝ Account Information</h3>
         
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
           <div>
@@ -1286,7 +1288,7 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
                     <option key={l}>{l}</option>
                   ))}
                 </select>
-                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>Language applies instantly — no reload needed.</div>
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>Language applies instantly â��⬝ no reload needed.</div>
               </div>
             </div>
 
@@ -1322,7 +1324,7 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
       </div>
 
       <div style={{ background: "white", borderRadius: 20, padding: "28px", border: "1px solid #f1f5f9", boxShadow: "0 4px 20px rgba(0,0,0,0.06)" }}>
-        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#1c1917", margin: "0 0 16px" }}>🔒 Change Password</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#1c1917", margin: "0 0 16px" }}>ðŸ⬝�" Change Password</h3>
         
         <form onSubmit={handlePasswordChange}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
@@ -1334,7 +1336,7 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
                   type={showPassword.current ? "text" : "password"} 
                   value={passwordForm.currentPassword}
                   onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  placeholder="••••••••"
+                  placeholder="â��¢â��¢â��¢â��¢â��¢â��¢â��¢â��¢"
                   disabled={changingPassword}
                 />
                 <button
@@ -1342,7 +1344,7 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
                   onClick={() => setShowPassword({ ...showPassword, current: !showPassword.current })}
                   style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#9ca3af" }}
                 >
-                  {showPassword.current ? "🙈" : "👁️"}
+                  {showPassword.current ? "ðŸ��� " : "ðŸ��ï¸"}
                 </button>
               </div>
             </div>
@@ -1363,7 +1365,7 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
                   onClick={() => setShowPassword({ ...showPassword, new: !showPassword.new })}
                   style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#9ca3af" }}
                 >
-                  {showPassword.new ? "🙈" : "👁️"}
+                  {showPassword.new ? "ðŸ��� " : "ðŸ��ï¸"}
                 </button>
               </div>
             </div>
@@ -1384,7 +1386,7 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
                   onClick={() => setShowPassword({ ...showPassword, confirm: !showPassword.confirm })}
                   style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#9ca3af" }}
                 >
-                  {showPassword.confirm ? "🙈" : "👁️"}
+                  {showPassword.confirm ? "ðŸ��� " : "ðŸ��ï¸"}
                 </button>
               </div>
             </div>
@@ -1395,12 +1397,12 @@ function ProfileTab({ user, onWorkingCenterChange, onUserUpdate }) {
             style={{ ...S.primaryBtn, background: "linear-gradient(135deg,#ef4444,#dc2626)", opacity: changingPassword ? 0.7 : 1 }}
             disabled={changingPassword}
           >
-            {changingPassword ? "Updating Password..." : "🔒 Update Password"}
+            {changingPassword ? "Updating Password..." : "ðŸ⬝�" Update Password"}
           </button>
         </form>
         
         <div style={{ marginTop: 12, padding: "12px", background: "#fef3c7", borderRadius: 8, border: "1px solid #fbbf24" }}>
-          <div style={{ fontSize: 11, color: "#92400e", fontWeight: 700, marginBottom: 4 }}>🔐 Security Tips:</div>
+          <div style={{ fontSize: 11, color: "#92400e", fontWeight: 700, marginBottom: 4 }}>ðŸ⬝ Security Tips:</div>
           <ul style={{ fontSize: 11, color: "#78350f", margin: 0, paddingLeft: 16, lineHeight: 1.6 }}>
             <li>Use a strong password with at least 8 characters</li>
             <li>Include a mix of letters, numbers, and special characters</li>
@@ -1416,24 +1418,24 @@ function NotificationsTab({ notifications = [], onMarkRead, onMarkAllRead }) {
   // Start: Dnyaneshwari Thorat
   const icons = {
     // course-related
-    course: "📚", course_assigned: "📚", course_allocated: "📚",
+    course: "ðŸ�Sš", course_assigned: "ðŸ�Sš", course_allocated: "ðŸ�Sš",
     // certificate
-    certificate: "🏆", certificate_issued: "🏆", certificate_generated: "🏆",
+    certificate: "ðŸ⬠", certificate_issued: "ðŸ⬠", certificate_generated: "ðŸ⬠",
     // lesson / session
-    session: "📹", lesson: "📖", lesson_assigned: "📖",
+    session: "ðŸ�S¹", lesson: "ðŸ�S�", lesson_assigned: "ðŸ�S�",
     // assignment / task
-    assignment: "📝", task: "📝", daily_task: "📝",
+    assignment: "ðŸ�S", task: "ðŸ�S", daily_task: "ðŸ�S",
     // approvals
-    approval: "✅", approved: "✅", status: "✅",
+    approval: "â�⬦", approved: "â�⬦", status: "â�⬦",
     // attendance
-    attendance: "📋", attendance_alert: "⚠️",
+    attendance: "ðŸ�S⬹", attendance_alert: "âš ï¸",
     // general
-    info: "ℹ️", warning: "⚠️", alert: "🔔", system: "⚙️",
+    info: "â�~¹ï¸", warning: "âš ï¸", alert: "ðŸ⬝⬝", system: "âš��ï¸",
   };
   const getIcon = (type) => {
-    if (!type) return "🔔";
+    if (!type) return "ðŸ⬝⬝";
     const lower = String(type).toLowerCase();
-    return icons[lower] || "🔔";
+    return icons[lower] || "ðŸ⬝⬝";
   };
   // End: Dnyaneshwari Thorat
 
@@ -1444,7 +1446,7 @@ function NotificationsTab({ notifications = [], onMarkRead, onMarkAllRead }) {
           <h1 style={S.pageTitle}>Notifications</h1>
           <p style={S.pageSub}>{notifications.filter(n=>!n.read).length} unread</p>
         </div>
-        <button onClick={onMarkAllRead} style={S.exportBtn}>✓ Mark all read</button>
+        <button onClick={onMarkAllRead} style={S.exportBtn}>â��S Mark all read</button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {notifications.length === 0 ? (
@@ -1481,7 +1483,7 @@ function TeacherFeedbackTab({ user, setToast }) {
 
   const TAGS = ["Content Quality", "Platform UX", "Trainer", "Schedule", "Price"];
   const stars = (n, size=20) => Array.from({length:5},(_,i) => (
-    <span key={i} style={{fontSize:size, cursor:"pointer", color: i < n ? "#f59e0b" : "#e5e7eb"}}>{i < n ? "★" : "☆"}</span>
+    <span key={i} style={{fontSize:size, cursor:"pointer", color: i < n ? "#f59e0b" : "#e5e7eb"}}>{i < n ? "â�S⬦" : "â�S⬠"}</span>
   ));
 
   useEffect(() => {
@@ -1530,7 +1532,7 @@ function TeacherFeedbackTab({ user, setToast }) {
       <p style={S.pageSub}>Share your training experience and help us improve.</p>
 
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20 }}>
-        <SectionCard title="📝 New Feedback">
+        <SectionCard title="ðŸ�S New Feedback">
           <form onSubmit={handleSubmit}>
             <label style={S.label}>Course / Training (optional)</label>
             <input style={{...S.input, marginBottom:12}} value={course} onChange={e=>setCourse(e.target.value)} placeholder="e.g. Child Development Basics"/>
@@ -1552,7 +1554,7 @@ function TeacherFeedbackTab({ user, setToast }) {
             <div style={{display:"flex", gap:4, marginBottom:12, cursor:"pointer"}}>
               {[1,2,3,4,5].map(i => (
                 <span key={i} onClick={()=>setRating(i)} style={{fontSize:28, color: i<=rating?"#f59e0b":"#e5e7eb"}}>
-                  {i<=rating?"★":"☆"}
+                  {i<=rating?"â�S⬦":"â�S⬠"}
                 </span>
               ))}
               {rating > 0 && <span style={{fontSize:12, color:"#6b7280", marginLeft:8, alignSelf:"center"}}>{rating}/5</span>}
@@ -1562,7 +1564,7 @@ function TeacherFeedbackTab({ user, setToast }) {
             <div style={{display:"flex", gap:4, marginBottom:12, cursor:"pointer"}}>
               {[1,2,3,4,5].map(i => (
                 <span key={i} onClick={()=>setTRating(i)} style={{fontSize:22, color: i<=trainerRating?"#f59e0b":"#e5e7eb"}}>
-                  {i<=trainerRating?"★":"☆"}
+                  {i<=trainerRating?"â�S⬦":"â�S⬠"}
                 </span>
               ))}
             </div>
@@ -1578,22 +1580,22 @@ function TeacherFeedbackTab({ user, setToast }) {
                 <div style={{position:"absolute", top:2, left:anonymous?18:2, width:18, height:18, borderRadius:"50%", background:"white", transition:"left 0.3s", boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/>
               </div>
               <label style={{fontSize:12, color:"#374151", fontWeight:600, cursor:"pointer"}} onClick={()=>setAnonymous(!anonymous)}>
-                🔒 Submit anonymously
+                ðŸ⬝�" Submit anonymously
               </label>
             </div>
 
             <button type="submit" disabled={submitting} style={{...S.primaryBtn, width:"100%"}}>
-              {submitting ? "Submitting..." : "📤 Submit Feedback"}
+              {submitting ? "Submitting..." : "ðŸ�S¤ Submit Feedback"}
             </button>
           </form>
         </SectionCard>
 
-        <SectionCard title="📋 My Previous Submissions">
+        <SectionCard title="ðŸ�S⬹ My Previous Submissions">
           {loading ? (
             <div style={{textAlign:"center", padding:30, color:"#9ca3af"}}>Loading...</div>
           ) : myFeedbacks.length === 0 ? (
             <div style={{textAlign:"center", padding:30, color:"#94a3b8"}}>
-              <div style={{fontSize:36, marginBottom:8}}>💬</div>
+              <div style={{fontSize:36, marginBottom:8}}>ðŸ�"¬</div>
               <div style={{fontSize:13}}>You haven't submitted any feedback yet.</div>
             </div>
           ) : (
@@ -1605,17 +1607,17 @@ function TeacherFeedbackTab({ user, setToast }) {
                     <StatusBadge status={f.status || "pending"}/>
                   </div>
                   <div style={{display:"flex", gap:4, marginBottom:6}}>
-                    {[1,2,3,4,5].map(j=><span key={j} style={{fontSize:14, color:j<=f.rating?"#f59e0b":"#e5e7eb"}}>★</span>)}
+                    {[1,2,3,4,5].map(j=><span key={j} style={{fontSize:14, color:j<=f.rating?"#f59e0b":"#e5e7eb"}}>â�S⬦</span>)}
                     <span style={{fontSize:11, color:"#6b7280", marginLeft:4}}>{f.rating}/5</span>
                   </div>
                   <div style={{fontSize:12, color:"#6b7280", fontStyle:"italic"}}>"{(f.suggestion||"").substring(0,80)}..."</div>
                   {f.adminResponse && (
                     <div style={{marginTop:8, padding:"6px 10px", background:"#f0f9ff", borderRadius:8, fontSize:11, color:"#0369a1"}}>
-                      💬 Admin: {f.adminResponse}
+                      ðŸ�"¬ Admin: {f.adminResponse}
                     </div>
                   )}
                   <div style={{fontSize:10, color:"#9ca3af", marginTop:6}}>
-                    {f.tag} · {f.date || new Date(f.createdAt).toLocaleDateString("en-IN")}
+                    {f.tag} �· {f.date || new Date(f.createdAt).toLocaleDateString("en-IN")}
                   </div>
                 </div>
               ))}
@@ -1627,9 +1629,9 @@ function TeacherFeedbackTab({ user, setToast }) {
   );
 }
 // Snehal change: real sessions + status tracking + feedback connected to backend
-/* ═══════════════════════════════════════════
+/* â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢
    PARENT CAPACITY BUILDING TAB
-═══════════════════════════════════════════ */
+â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢ */
 function ParentCapacityBuildingTab({ user, setToast }) {
   const [modules, setModules] = useState([]);
   const [selectedModuleId, setSelectedModuleId] = useState("");
@@ -1714,7 +1716,7 @@ function ParentCapacityBuildingTab({ user, setToast }) {
     setParticipants(updated);
   };
 
-  // Snehal change: real submit — uploads files, then saves feedback + marks Completed
+  // Snehal change: real submit â��⬝ uploads files, then saves feedback + marks Completed
   const handleSubmitFeedback = async () => {
     if (!feedback.overallRating) {
       setToast?.({ msg: "Please give an overall session rating.", type: "error" });
@@ -1760,7 +1762,7 @@ function ParentCapacityBuildingTab({ user, setToast }) {
   const stars = (value, onChange, size = 22) => (
     <div style={{ display: "flex", gap: 4, cursor: "pointer" }}>
       {[1, 2, 3, 4, 5].map(i => (
-        <span key={i} onClick={() => onChange(i)} style={{ fontSize: size, color: i <= value ? "#f59e0b" : "#e5e7eb" }}>{i <= value ? "★" : "☆"}</span>
+        <span key={i} onClick={() => onChange(i)} style={{ fontSize: size, color: i <= value ? "#f59e0b" : "#e5e7eb" }}>{i <= value ? "â�S⬦" : "â�S⬠"}</span>
       ))}
     </div>
   );
@@ -1787,8 +1789,8 @@ function ParentCapacityBuildingTab({ user, setToast }) {
           onChange={e => setSessionLang(e.target.value)}
         >
           <option value="en">English</option>
-          <option value="hi">हिंदी</option>
-          <option value="mr">मराठी</option>
+          <option value="hi">à¤¹à¤¿à¤�aà¤¦à¥��</option>
+          <option value="mr">à¤®à¤°à¤¾à¤ à¥��</option>
         </select>
       </div>
 
@@ -1835,7 +1837,7 @@ function ParentCapacityBuildingTab({ user, setToast }) {
                   {/* Snehal change: Mark as Completed / Start Session button */}
                   <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
                     {status === "Completed" ? (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#059669" }}>✓ Session Completed</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#059669" }}>â��S Session Completed</span>
                     ) : (
                       <button
                         onClick={() => openFeedback(sess)}
@@ -1857,8 +1859,8 @@ function ParentCapacityBuildingTab({ user, setToast }) {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, backdropFilter: "blur(4px)" }}>
           <div style={{ background: "white", borderRadius: 20, padding: "28px", width: "100%", maxWidth: 600, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ fontSize: 17, fontWeight: 800, color: "#1c1917", margin: 0 }}>Session Feedback — {selectedSession.title}</h3>
-              <button onClick={() => setFeedbackOpen(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af" }}>✕</button>
+              <h3 style={{ fontSize: 17, fontWeight: 800, color: "#1c1917", margin: 0 }}>Session Feedback â��⬝ {selectedSession.title}</h3>
+              <button onClick={() => setFeedbackOpen(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af" }}>â�⬢</button>
             </div>
 
             <h4 style={{ fontSize: 13, fontWeight: 800, color: "#1c1917", marginBottom: 10 }}>Session Details</h4>
@@ -1903,7 +1905,7 @@ function ParentCapacityBuildingTab({ user, setToast }) {
                 <input type="file" ref={photoInputRef} accept="image/*" style={{ display: "none" }}
                   onChange={e => setPhotoFile(e.target.files?.[0] || null)} />
                 <div onClick={() => photoInputRef.current?.click()} style={{ border: "2px dashed #fbbf24", borderRadius: 10, padding: "14px", textAlign: "center", cursor: "pointer", background: "#fffbeb" }}>
-                  <div style={{ fontSize: 20 }}>📷</div>
+                  <div style={{ fontSize: 20 }}>ðŸ�S·</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: photoFile ? "#059669" : "#92400e" }}>
                     {photoFile ? photoFile.name : "Upload photo"}
                   </div>
@@ -1914,7 +1916,7 @@ function ParentCapacityBuildingTab({ user, setToast }) {
                 <input type="file" ref={attendanceInputRef} accept="image/*,.pdf" style={{ display: "none" }}
                   onChange={e => setAttendanceFile(e.target.files?.[0] || null)} />
                 <div onClick={() => attendanceInputRef.current?.click()} style={{ border: "2px dashed #fbbf24", borderRadius: 10, padding: "14px", textAlign: "center", cursor: "pointer", background: "#fffbeb" }}>
-                  <div style={{ fontSize: 20 }}>📋</div>
+                  <div style={{ fontSize: 20 }}>ðŸ�S⬹</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: attendanceFile ? "#059669" : "#92400e" }}>
                     {attendanceFile ? attendanceFile.name : "Upload attendance sheet"}
                   </div>
@@ -1971,9 +1973,236 @@ function ParentCapacityBuildingTab({ user, setToast }) {
     </div>
   );
 }
-/* ═══════════════════════════════════════════
+/* â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢
    MAIN TEACHER DASHBOARD
-═══════════════════════════════════════════ */
+â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢ */
+/* â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢
+   GROWTH CYCLE TAB (Teacher / Fellow side)
+   â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��â⬝��
+   Targets the REAL, already-existing backend/src/routes/teacherGrowthCycle.js
+   (mounted at /api/teacher/growth-cycles, requireRole("teacher","fellow")):
+     GET  /api/teacher/growth-cycles            -> getMyPDCACycles()
+     POST /api/teacher/growth-cycles/:id/do     -> submitPDCADo(cycleId, doText)
+          (only allowed while status === "planned")
+     POST /api/teacher/growth-cycles/:id/act    -> submitPDCAAct(cycleId, actText)
+          (only allowed while status === "checked")
+   Cycle field names returned by the backend: plan, planTitle, doText,
+   doSubmittedAt, checkFeedback, checkedAt, actText, actSubmittedAt, status.
+   Status machine: "planned" -> "do_submitted" -> "checked" -> "completed"
+â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢â⬢ */
+function GrowthCycleTab({ user, setToast }) {
+  const [cycles, setCycles] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [doModalCycle, setDoModalCycle] = useState(null);
+  const [doText, setDoText] = useState("");
+  const [submittingDo, setSubmittingDo] = useState(false);
+
+  const [actModalCycle, setActModalCycle] = useState(null);
+  const [actText, setActText] = useState("");
+  const [submittingAct, setSubmittingAct] = useState(false);
+
+  const fetchCycles = () => {
+    setLoading(true);
+    getMyPDCACycles()
+      .then(res => setCycles(res.cycles || []))
+      .catch(err => console.error("Failed to fetch Growth Cycles", err))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchCycles();
+  }, []);
+
+  const openDoModal = (cycle) => {
+    setDoModalCycle(cycle);
+    setDoText(cycle.doText || "");
+  };
+  const closeDoModal = () => {
+    setDoModalCycle(null);
+    setDoText("");
+  };
+
+  const openActModal = (cycle) => {
+    setActModalCycle(cycle);
+    setActText(cycle.actText || "");
+  };
+  const closeActModal = () => {
+    setActModalCycle(null);
+    setActText("");
+  };
+
+  const handleSubmitDo = async () => {
+    if (!doText.trim()) {
+      setToast?.({ msg: "Please describe the work you completed.", type: "error" });
+      return;
+    }
+    setSubmittingDo(true);
+    try {
+      await submitPDCADo(doModalCycle._id, doText.trim());
+      setToast?.({ msg: "Work submitted! Your mentor will review it soon.", type: "success" });
+      closeDoModal();
+      fetchCycles();
+    } catch (err) {
+      setToast?.({ msg: err.message || "Failed to submit your work.", type: "error" });
+    } finally {
+      setSubmittingDo(false);
+    }
+  };
+
+  const handleSubmitAct = async () => {
+    if (!actText.trim()) {
+      setToast?.({ msg: "Please describe your next steps before submitting.", type: "error" });
+      return;
+    }
+    setSubmittingAct(true);
+    try {
+      await submitPDCAAct(actModalCycle._id, actText.trim());
+      setToast?.({ msg: "Act submitted â��⬝ this Growth Cycle is now complete!", type: "success" });
+      closeActModal();
+      fetchCycles();
+    } catch (err) {
+      setToast?.({ msg: err.message || "Failed to submit your Act.", type: "error" });
+    } finally {
+      setSubmittingAct(false);
+    }
+  };
+
+  const statusMeta = (status) => {
+    if (status === "completed") return { label: "â��S Completed", bg: "#d1fae5", color: "#059669" };
+    if (status === "checked") return { label: "ðŸŽ¯ Ready for Your Act", bg: "#ede9fe", color: "#6d28d9" };
+    if (status === "do_submitted") return { label: "â³ Awaiting Mentor Review", bg: "#fef3c7", color: "#b45309" };
+    return { label: "ðŸ�S¨ New Plan Assigned", bg: "#dbeafe", color: "#1d4ed8" };
+  };
+
+  const sorted = [...cycles].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  const pendingDoCount = cycles.filter(c => c.status === "planned").length;
+  const awaitingReviewCount = cycles.filter(c => c.status === "do_submitted").length;
+  const pendingActCount = cycles.filter(c => c.status === "checked").length;
+  const completedCount = cycles.filter(c => c.status === "completed").length;
+
+  return (
+    <div style={{ animation: "fadeIn 0.3s ease" }}>
+      <h1 style={S.pageTitle}>Growth Cycle</h1>
+      <p style={S.pageSub}>Plans assigned by your mentor. Submit your Do, then your Act once reviewed.</p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 16, marginBottom: 20 }}>
+        <StatCard icon="ðŸ�S¥" label="Plans Assigned" val={cycles.length} color="#3b82f6" bg="#dbeafe" />
+        <StatCard icon="â�ï¸" label="To Submit (Do)" val={pendingDoCount} color="#f59e0b" bg="#fef3c7" />
+        <StatCard icon="â³" label="Awaiting Review" val={awaitingReviewCount} color="#8b5cf6" bg="#ede9fe" />
+        <StatCard icon="ðŸŽ¯" label="To Submit (Act)" val={pendingActCount} color="#6d28d9" bg="#ede9fe" />
+        <StatCard icon="â�⬦" label="Completed" val={completedCount} color="#10b981" bg="#d1fae5" />
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Loading...</div>
+      ) : sorted.length === 0 ? (
+        <div style={{ padding: 40, textAlign: "center", background: "white", borderRadius: 16, border: "1px dashed #cbd5e1", color: "#94a3b8" }}>
+          No Growth Cycle plans assigned by your mentor yet.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {sorted.map((item, i) => {
+            const sm = statusMeta(item.status);
+            return (
+              <div key={item._id || i} style={{ background: "white", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", padding: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>Growth Cycle {item.cycleNumber || i + 1}{item.planTitle ? `: ${item.planTitle}` : ""}</div>
+                  <div style={{ fontSize: 10, fontWeight: 800, background: sm.bg, color: sm.color, padding: "2px 8px", borderRadius: 10 }}>{sm.label}</div>
+                </div>
+
+                <div style={{ marginBottom: 10, background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#4338ca", marginBottom: 4 }}>PLAN (From Your Mentor)</div>
+                  <div style={{ fontSize: 13, color: "#1e1b4b", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{item.plan}</div>
+                </div>
+
+                {item.doText ? (
+                  <div style={{ marginBottom: 10, background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "#b45309", marginBottom: 4 }}>DO (Your Submitted Work)</div>
+                    <div style={{ fontSize: 13, color: "#78350f", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{item.doText}</div>
+                    {item.doSubmittedAt && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Submitted: {new Date(item.doSubmittedAt).toLocaleDateString()}</div>}
+                  </div>
+                ) : (
+                  <button onClick={() => openDoModal(item)} style={{ ...S.primaryBtn, padding: "8px 16px", fontSize: 12, marginBottom: 10 }}>
+                    â�ï¸ Submit Your Work (Do)
+                  </button>
+                )}
+
+                {item.checkFeedback && (
+                  <div style={{ marginBottom: item.actText || item.status === "checked" ? 10 : 0, background: "#d1fae5", border: "1px solid #a7f3d0", borderRadius: 8, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "#059669", marginBottom: 4 }}>CHECK (Mentor's Review)</div>
+                    <div style={{ fontSize: 13, color: "#065f46", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{item.checkFeedback}</div>
+                  </div>
+                )}
+
+                {item.status === "do_submitted" && (
+                  <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic" }}>Waiting for your mentor's review...</div>
+                )}
+
+                {item.status === "checked" && (
+                  <button onClick={() => openActModal(item)} style={{ ...S.primaryBtn, padding: "8px 16px", fontSize: 12, background: "linear-gradient(135deg,#7c3aed,#6d28d9)" }}>
+                    ðŸŽ¯ Submit Your Act (Next Steps)
+                  </button>
+                )}
+
+                {item.actText && (
+                  <div style={{ background: "#ede9fe", border: "1px solid #ddd6fe", borderRadius: 8, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "#6d28d9", marginBottom: 4 }}>ACT (Your Next Steps)</div>
+                    <div style={{ fontSize: 13, color: "#4c1d95", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{item.actText}</div>
+                    {item.actSubmittedAt && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Submitted: {new Date(item.actSubmittedAt).toLocaleDateString()}</div>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {doModalCycle && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, backdropFilter: "blur(4px)" }}>
+          <div style={{ background: "white", borderRadius: 20, padding: "28px", width: "100%", maxWidth: 500, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ fontSize: 17, fontWeight: 800, color: "#1c1917", margin: "0 0 6px" }}>Submit Your Work â��⬝ Cycle {doModalCycle.cycleNumber}</h3>
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: 10, marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#4338ca", marginBottom: 4 }}>PLAN</div>
+              <div style={{ fontSize: 13, color: "#374151", whiteSpace: "pre-wrap" }}>{doModalCycle.plan}</div>
+            </div>
+            <label style={S.label}>DO (Action Taken) *</label>
+            <textarea autoFocus style={{ ...S.input, minHeight: 120, marginBottom: 20 }} value={doText} onChange={e => setDoText(e.target.value)} placeholder="Describe what you did to work on this plan..." />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={closeDoModal} style={S.exportBtn}>Cancel</button>
+              <button onClick={handleSubmitDo} disabled={submittingDo} style={{ ...S.primaryBtn, opacity: submittingDo ? 0.7 : 1 }}>
+                {submittingDo ? "Submitting..." : "Submit Work"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {actModalCycle && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, backdropFilter: "blur(4px)" }}>
+          <div style={{ background: "white", borderRadius: 20, padding: "28px", width: "100%", maxWidth: 500, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ fontSize: 17, fontWeight: 800, color: "#1c1917", margin: "0 0 6px" }}>Submit Your Act â��⬝ Cycle {actModalCycle.cycleNumber}</h3>
+            <div style={{ background: "#d1fae5", border: "1px solid #a7f3d0", borderRadius: 8, padding: 10, marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#059669", marginBottom: 4 }}>CHECK (Mentor's Review)</div>
+              <div style={{ fontSize: 13, color: "#065f46", whiteSpace: "pre-wrap" }}>{actModalCycle.checkFeedback}</div>
+            </div>
+            <label style={S.label}>ACT (Next Steps & Adjustments) *</label>
+            <textarea autoFocus style={{ ...S.input, minHeight: 120, marginBottom: 20 }} value={actText} onChange={e => setActText(e.target.value)} placeholder="Based on your mentor's review, what will you change or do next?" />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={closeActModal} style={S.exportBtn}>Cancel</button>
+              <button onClick={handleSubmitAct} disabled={submittingAct} style={{ ...S.primaryBtn, opacity: submittingAct ? 0.7 : 1 }}>
+                {submittingAct ? "Submitting..." : "Submit Act"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
 export default function TeacherDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab]         = useState("overview");
   const [menuOpen, setMenuOpen]           = useState(false);
@@ -2095,7 +2324,7 @@ export default function TeacherDashboard({ user, onLogout }) {
         read: newNotif.read
       };
       setNotifications((prev) => [mapped, ...prev]);
-      setToast({ msg: `🔔 ${newNotif.title}`, type: "info" });
+      setToast({ msg: `ðŸ⬝⬝ ${newNotif.title}`, type: "info" });
       
       // Dynamically refresh the dashboard if it's an approval, claim, status update, or class/center assignment
       if (
@@ -2131,7 +2360,7 @@ export default function TeacherDashboard({ user, onLogout }) {
   const handleMarkDone = async (assignId, payload) => {
     try {
       await updateCourseAssignmentProgress(assignId, payload);
-      setToast({ msg: "Progress saved! ✓", type: "success" });
+      setToast({ msg: "Progress saved! â��S", type: "success" });
       refreshCoreData();
     } catch (err) {
       setToast({ msg: "Failed to save progress.", type: "error" });
@@ -2140,7 +2369,7 @@ export default function TeacherDashboard({ user, onLogout }) {
 
   const handleSubmitAssignment = async (assignId, payload) => {
     await updateCourseAssignmentProgress(assignId, payload);
-    setToast({ msg: "Assignment submitted successfully! 📤", type: "success" });
+    setToast({ msg: "Assignment submitted successfully! ðŸ�S¤", type: "success" });
     refreshCoreData();
   };
 
@@ -2217,32 +2446,29 @@ export default function TeacherDashboard({ user, onLogout }) {
   const pendingAssignmentsCount = courses.filter(a=>a.status==="assigned"||a.status==="revision").length;
 
   const navItems = [
-    { key: "overview",      label: currentUser?.role === "fellow" ? t("Fellow's Dashboard") : t("Teacher's Dashboard"), icon: "📊" },
-    { key: "children_att",  label: t("Daily Attendance"),    icon: "📋" },
-    { key: "geotag",        label: t("Geotag Attendance"),   icon: "📍" },
-    { key: "training",      label: t("Training & Lessons"),  icon: "🎓" },
-    { key: "growth_cycle",  label: "Growth Cycle",           icon: "🔄" },
-    { key: "planner",       label: t("AI Lesson Planner"), icon: "✏️" },
-    { key: "courses",       label: t("My Courses"),          icon: "📚" },
-    { key: "parent_capacity", label: t("Parent Capacity Building"), icon: "👪" },
-    { key: "assessment",    label: t("Assessments"),         icon: "📝" },
-    { key: "certificates",  label: t("Certificates"),        icon: "🏆" },
-    { key: "feedback",      label: t("Feedback"),             icon: "💬" },
+    { key: "overview",      label: currentUser?.role === "fellow" ? t("Fellow's Dashboard") : t("Teacher's Dashboard"), icon: "ðŸ�SŠ" },
+    { key: "children_att",  label: t("Daily Attendance"),    icon: "ðŸ�S⬹" },
+    { key: "geotag",        label: t("Geotag Attendance"),   icon: "ðŸ�S" },
+    { key: "training",      label: t("Training & Lessons"),  icon: "ðŸŽ�S" },
+    { key: "growth_cycle", label: "Growth Cycle", icon: "=" },
+    { key: "planner",       label: t("AI Lesson Planner"), icon: "â�ï¸" },
+    { key: "courses",       label: t("My Courses"),          icon: "ðŸ�Sš" },
+    { key: "parent_capacity", label: t("Parent Capacity Building"), icon: "ðŸ��ª" },
+    { key: "assessment",    label: t("Assessments"),         icon: "ðŸ�S" },
+    { key: "certificates",  label: t("Certificates"),        icon: "ðŸ⬠" },
+    { key: "feedback",      label: t("Feedback"),             icon: "ðŸ�"¬" },
   ];
 
-  // Start: Fellow-only tabs
-  if (currentUser?.role === "fellow") {
-    navItems.splice(navItems.length - 1, 0,
-      { key: "curriculum", label: t("Curriculum"), icon: "📖" }
-    );
-  }
-  // End: Fellow-only tabs
+  // Dedicated LMS My Curriculum tab
+  navItems.splice(navItems.length - 1, 0,
+    { key: "curriculum", label: t("My Curriculum"), icon: "ðŸ�Sš" }
+  );
 
   const enrichedUser = { ...currentUser, workingCenter };
 
   // Pages that are fully wired to backend/database and should render normally.
   // Every other page shows an "Under Construction" placeholder instead.
-  // "courses" and "assessment" are now notes/assessment based (no video) —
+  // "courses" and "assessment" are now notes/assessment based (no video) â��⬝
   // both are fully wired, so they're included here.
   const WORKING_TABS = new Set(["overview", "children_att", "geotag", "profile", "training", "courses", "assessment", "certificates", "notifications", "feedback","lesson_planner", "parent_capacity", "curriculum","planner", "growth_cycle"]);
 
@@ -2250,21 +2476,21 @@ export default function TeacherDashboard({ user, onLogout }) {
     if (loading) {
       return (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh", fontSize: 16, fontWeight: 700, color: "#64748b" }}>
-          🔄 Loading Portal Data...
+          ðŸ⬝�~ Loading Portal Data...
         </div>
       );
     }
     if (tabLoading) {
       return (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "40vh", fontSize: 14, fontWeight: 600, color: "#d97706" }}>
-          🔄 Loading...
+          ðŸ⬝�~ Loading...
         </div>
       );
     }
 
     if (!WORKING_TABS.has(activeTab)) {
       const navItem = navItems.find(n => n.key === activeTab);
-      return <UnderConstructionTab label={navItem ? t(navItem.label) : "This page"} icon={navItem?.icon || "🚧"} />;
+      return <UnderConstructionTab label={navItem ? t(navItem.label) : "This page"} icon={navItem?.icon || "ðŸš§"} />;
     }
 
     switch(activeTab) {
@@ -2272,7 +2498,7 @@ export default function TeacherDashboard({ user, onLogout }) {
       case "children_att":  return <AttendanceManager user={enrichedUser} onRosterChange={refreshCoreData}/>;
       case "geotag":        return <GeotagAttendance user={enrichedUser}/>;
       case "training":      return <TrainingAndClassroomManager user={enrichedUser}/>;
-      case "growth_cycle":  return <GrowthCycleTab user={enrichedUser} setToast={setToast} />;
+      case "growth_cycle":  return <GrowthCycleTab setToast={setToast} />;
       case "planner":       return <LessonPlannerTab setToast={setToast} user={enrichedUser}/>;
       case "courses":
         return (
@@ -2308,7 +2534,7 @@ export default function TeacherDashboard({ user, onLogout }) {
         <div style={{ padding: "20px 16px 12px" }}>
           <Logo size={120}/>
           <div style={{ textAlign: "center", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "#dbeafe", color: "#1e40af", border: "1px solid #bfdbfe", margin: "6px auto 0", display: "inline-block", width: "fit-content" }}>
-            🎓 {t(currentUser?.role === "fellow" ? "Fellow Panel" : "Teacher Panel")}
+            ðŸŽ�S {t(currentUser?.role === "fellow" ? "Fellow Panel" : "Teacher Panel")}
           </div>
         </div>
         <nav style={{ padding: "4px 10px", flex: 1, overflowY: "auto", marginBottom: 80 }}>
@@ -2339,7 +2565,7 @@ export default function TeacherDashboard({ user, onLogout }) {
             }}
             onMouseEnter={(e)=>e.currentTarget.style.background="#fee2e2"}
             onMouseLeave={(e)=>e.currentTarget.style.background="transparent"}
-          >⏻</button>
+          >â»</button>
         </div>
       </div>
 
@@ -2360,7 +2586,7 @@ export default function TeacherDashboard({ user, onLogout }) {
             onMouseEnter={(e) => { e.currentTarget.style.background = "#eff6ff"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "white"; }}
           >
-            <span style={{ fontSize: 14, lineHeight: 1 }}>📖</span>
+            <span style={{ fontSize: 14, lineHeight: 1 }}>ðŸ�S�</span>
             {t("User Guide")}
           </button>
 
@@ -2386,7 +2612,7 @@ export default function TeacherDashboard({ user, onLogout }) {
               </span>
             )}
             <div style={{ fontSize: 14, fontWeight: 700, color: "#92400e" }}>{currentUser.name?.split(" ")[0] || (currentUser.role === "fellow" ? "Fellow" : "Teacher")}</div>
-            <div style={{ fontSize: 18, fontWeight: 700, paddingBottom: 6, color: "#92400e" }}>⋮</div>
+            <div style={{ fontSize: 18, fontWeight: 700, paddingBottom: 6, color: "#92400e" }}>â⬹®</div>
           </div>
 
           {menuOpen && (
@@ -2446,13 +2672,13 @@ export default function TeacherDashboard({ user, onLogout }) {
           <div style={{ width: 340, height: 460, background: "rgba(255, 255, 255, 0.95)", backdropFilter: "blur(12px)", border: "1px solid #fbbf24", borderRadius: 20, boxShadow: "0 10px 40px rgba(0,0,0,0.12)", marginBottom: 16, display: "flex", flexDirection: "column", overflow: "hidden", animation: "slideUp 0.3s ease" }}>
             <div style={{ background: "linear-gradient(135deg,#f59e0b 0%,#d97706 100%)", padding: "16px 20px", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 24 }}>🤖</span>
+                <span style={{ fontSize: 24 }}>ðŸ¤�</span>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: "-0.2px" }}>SpaceCE Assistant</div>
-                  <div style={{ fontSize: 10, opacity: 0.85, fontWeight: 700 }}>Online · Portal Helper</div>
+                  <div style={{ fontSize: 10, opacity: 0.85, fontWeight: 700 }}>Online �· Portal Helper</div>
                 </div>
               </div>
-              <button onClick={() => setChatOpen(false)} style={{ background: "none", border: "none", color: "white", fontSize: 18, cursor: "pointer", padding: 0 }}>✕</button>
+              <button onClick={() => setChatOpen(false)} style={{ background: "none", border: "none", color: "white", fontSize: 18, cursor: "pointer", padding: 0 }}>â�⬢</button>
             </div>
             <div style={{ flex: 1, padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, background: "#fafbfc" }}>
               {chatMessages.map((msg, idx) => (
@@ -2496,7 +2722,7 @@ export default function TeacherDashboard({ user, onLogout }) {
                 onClick={handleSendChatMessage}
                 style={{ background: "linear-gradient(135deg,#f59e0b 0%,#d97706 100%)", border: "none", color: "white", borderRadius: 10, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 2px 6px rgba(217,119,6,0.3)" }}
               >
-                ➔
+                âž⬝
               </button>
             </div>
           </div>
@@ -2519,7 +2745,7 @@ export default function TeacherDashboard({ user, onLogout }) {
             transition: "transform 0.2s ease"
           }}
         >
-          💬
+          ðŸ�"¬
         </button>
       </div>
 
@@ -2527,3 +2753,5 @@ export default function TeacherDashboard({ user, onLogout }) {
     </div>
   );
 }
+
+

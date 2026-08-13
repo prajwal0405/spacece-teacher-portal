@@ -1,6 +1,7 @@
 import express from "express";
 import { CurriculumPlan, CurriculumPhase, CurriculumAssignment } from "../models/Curriculum.js";
 import { User } from "../models/User.js";
+import { ActivitySubmission } from "../models/ActivitySubmission.js";
 import mongoose from "mongoose";
 
 const router = express.Router();
@@ -319,6 +320,80 @@ router.get("/my-curriculum", async (req, res) => {
     res.json({ assignments, allPhases });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch fellow curriculum", error: error.message });
+  }
+});
+
+// Submit an activity work proof from the teacher/fellow side
+router.post("/submit-activity", async (req, res) => {
+  try {
+    const { assignmentId, curriculumName, moduleName, activityTitle, description, files, itemKey, phaseId } = req.body;
+    if (!description || !activityTitle) {
+      return res.status(400).json({ message: "Activity title and description are required" });
+    }
+
+    const fullDesc = `${description.trim()}\n\n[Linked Curriculum Module: ${curriculumName || "ECCE Framework"} - ${moduleName || "General Module"}]`;
+
+    let mentorId = null;
+    if (assignmentId) {
+      const assignmentDoc = await CurriculumAssignment.findById(assignmentId);
+      if (assignmentDoc) mentorId = assignmentDoc.assignedBy;
+    }
+    if (!mentorId) {
+      const teacherUser = await User.findById(req.user.id);
+      mentorId = teacherUser?.assignedMentor || null;
+    }
+
+    // 1. Create submission in ActivitySubmission collection for mentor review
+    const submission = new ActivitySubmission({
+      teacher: req.user.id,
+      mentor: mentorId,
+      activityDate: new Date(),
+      activityName: activityTitle,
+      description: fullDesc,
+      files: files || [],
+      status: "pending"
+    });
+    await submission.save();
+
+    // 2. Mark item completed in CurriculumAssignment if assignmentId & itemKey provided
+    let updatedProgressPercent = 0;
+    if (assignmentId && itemKey) {
+      const assignment = await CurriculumAssignment.findOne({ _id: assignmentId, fellow: req.user.id });
+      if (assignment) {
+        const existingIndex = (assignment.completedItems || []).findIndex(i => i.itemKey === itemKey);
+        if (existingIndex === -1) {
+          assignment.completedItems.push({
+            phaseId: phaseId || "",
+            moduleIndex: 0,
+            itemKey,
+            title: activityTitle,
+            completedAt: new Date()
+          });
+        }
+        
+        // Recalculate progress
+        const allPhases = await CurriculumPhase.find({ plan: assignment.plan });
+        let totalItemsCount = 0;
+        allPhases.forEach(p => {
+          (p.modules || []).forEach(m => {
+            const itemTotal = (m.deliverables?.length || 0) + (m.assessmentMethods?.length || 0) + (m.resources?.length || 0) + 1;
+            totalItemsCount += Math.max(1, itemTotal);
+          });
+        });
+
+        updatedProgressPercent = totalItemsCount > 0 ? Math.min(100, Math.round((assignment.completedItems.length / totalItemsCount) * 100)) : 0;
+        assignment.progressPercent = updatedProgressPercent;
+        await assignment.save();
+      }
+    }
+
+    res.status(201).json({
+      message: "Activity submitted successfully to Mentor inbox!",
+      submission,
+      progressPercent: updatedProgressPercent
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to submit activity", error: error.message });
   }
 });
 

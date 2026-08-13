@@ -1,0 +1,1 @@
+import mongoose from 'mongoose'; import { ActivitySubmission } from './src/models/ActivitySubmission.js'; async function run() { await mongoose.connect('mongodb://127.0.0.1:27017/spacece-teacher-portal'); const docs = await ActivitySubmission.find().sort({_id:-1}).limit(2); console.log(docs); await mongoose.disconnect(); } run();

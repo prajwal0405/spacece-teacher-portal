@@ -533,7 +533,7 @@ export default function MentorDashboard({ user, onLogout }) {
     { key: "mentees", label: "Teacher Management", icon: "👥", badge: pendingApprovalsCount },
     { key: "fellow_attendance", label: "Teacher Attendance", icon: "📅" },
     { key: "my_attendance", label: "My Attendance", icon: "📍" },
-    { key: "activities", label: "Fellow Activities", icon: "📝" },
+    { key: "activities", label: "Teacher Activities", icon: "📝" },
     { key: "curriculum", label: "Curriculum Management", icon: "📚" },
     { key: "impact", label: "Impact & Capstone", icon: "🏆" },
     { key: "documentation", label: "Growth Cycle", icon: "📝" },

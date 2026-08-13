@@ -1,0 +1,1 @@
+import mongoose from 'mongoose'; import { CurriculumAssignment } from './src/models/Curriculum.js'; async function run() { try { await mongoose.connect('mongodb://127.0.0.1:27017/spacece-teacher-portal'); const docs = await CurriculumAssignment.find(); console.log(JSON.stringify(docs, null, 2)); } catch(e) { console.error(e) } finally { await mongoose.disconnect(); } } run();

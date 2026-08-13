@@ -10,11 +10,6 @@ const router = express.Router();
 // ---------------------------------------------------------------------------
 // DB CONNECTION GUARD
 // ---------------------------------------------------------------------------
-// Mongoose readyState: 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
-// If Atlas is unreachable (cluster paused, IP not whitelisted, network blip),
-// every query below would otherwise hang until it times out and throws a
-// generic 500 with no useful message. This guard fails fast with a clear
-// 503 instead, and logs the readyState so it's obvious in the server console.
 function requireDbConnection(req, res, next) {
   const state = mongoose.connection.readyState;
   if (state !== 1) {
@@ -47,6 +42,8 @@ router.get("/mentees", async (req, res, next) => {
 });
 
 // --- PDCA / Growth Cycles ---
+
+// Mentor: list all cycles they created
 router.get("/pdca", async (req, res, next) => {
   try {
     const cycles = await PDCACycle.find({ mentorId: req.user.id })
@@ -58,96 +55,197 @@ router.get("/pdca", async (req, res, next) => {
   }
 });
 
-router.post("/pdca", async (req, res, next) => {
+// Mentor: create a new cycle in DRAFT state
+router.post("/pdca/draft", async (req, res, next) => {
   try {
-    console.log("[pdca:create] body received:", JSON.stringify(req.body));
+    const { 
+      menteeId, planTitle, planObjective, planArea, 
+      planExpectedOutcomes, planActivities, planStartDate, 
+      planTargetDate, planInstructions 
+    } = req.body;
 
-    const { menteeId, plan, do: doField, check, act, cycleNumber } = req.body;
-
-    if (!menteeId) {
-      return res.status(400).json({ success: false, message: "menteeId is required" });
+    if (!menteeId || !mongoose.Types.ObjectId.isValid(menteeId)) {
+      return res.status(400).json({ success: false, message: "Valid menteeId is required" });
     }
-    // FIX 1: validate menteeId is a real ObjectId *before* hitting Mongoose,
-    // so a bad/blank id from the frontend returns a clean 400 instead of a
-    // raw CastError 500.
-    if (!mongoose.Types.ObjectId.isValid(menteeId)) {
-      return res.status(400).json({ success: false, message: "menteeId is not a valid id." });
-    }
-    if (!plan || !doField || !check || !act) {
-      return res.status(400).json({ success: false, message: "All Growth Cycle fields (plan, do, check, act) are required" });
+    if (!planTitle || !planTitle.trim()) {
+      return res.status(400).json({ success: false, message: "A Plan Title is required." });
     }
 
-    // FIX 2: if a cycleNumber wasn't sent, or collides with one that already
-    // exists for this mentor+mentee, recompute it server-side instead of
-    // trusting whatever the frontend calculated (which can drift, e.g. after
-    // a failed earlier attempt, and trip a unique index).
     const existingForMentee = await PDCACycle.countDocuments({
       mentorId: req.user.id,
       menteeId,
     });
-    const safeCycleNumber = cycleNumber && !Number.isNaN(Number(cycleNumber))
-      ? Number(cycleNumber)
-      : existingForMentee + 1;
+    const cycleNumber = existingForMentee + 1;
 
     const cycle = await PDCACycle.create({
       mentorId: req.user.id,
       menteeId,
-      cycleNumber: safeCycleNumber,
-      plan,
-      do: doField,
-      check,
-      act
+      cycleNumber,
+      planTitle,
+      planObjective,
+      planArea,
+      planExpectedOutcomes,
+      planActivities,
+      planStartDate,
+      planTargetDate,
+      planInstructions,
+      status: "DRAFT",
     });
+
     const populated = await cycle.populate("menteeId", "name email");
     res.status(201).json({ success: true, cycle: populated });
   } catch (err) {
-    // FIX 3: turn the three most common Mongoose failure modes into clear,
-    // actionable 4xx responses instead of a bare 500 with no explanation.
-    console.error("[pdca:create] FAILED. Full error below:");
-    console.error("[pdca:create] DB readyState at time of failure:", mongoose.connection.readyState);
-    console.error(err);
+    next(err);
+  }
+});
 
-    if (err.code === 11000) {
-      // Duplicate key — almost always a unique index collision on
-      // {mentorId, cycleNumber} or similar. Log the offending key so it's
-      // visible in the server console even though we still respond cleanly.
-      console.error("[pdca:create] Duplicate key error. keyValue:", err.keyValue);
-      return res.status(409).json({
-        success: false,
-        message: "A Growth Cycle with that cycle number already exists for this fellow. Please try again.",
-        debug: err.keyValue,
-      });
+// Mentor: Update a plan (must be DRAFT)
+router.patch("/pdca/:id/plan", async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid cycle id." });
     }
-    if (err.name === "ValidationError") {
-      const fieldErrors = Object.keys(err.errors || {}).map(k => `${k}: ${err.errors[k].message}`);
-      console.error("[pdca:create] Validation error fields:", fieldErrors);
-      return res.status(400).json({
-        success: false,
-        message: "Growth Cycle validation failed.",
-        debug: fieldErrors,
-      });
-    }
-    if (err.name === "CastError") {
-      console.error("[pdca:create] Cast error on field:", err.path, "value:", err.value);
-      return res.status(400).json({
-        success: false,
-        message: `Invalid value for field "${err.path}".`,
-        debug: { path: err.path, value: err.value },
-      });
-    }
-    // FIX 4: Mongoose network/timeout errors (e.g. MongoServerSelectionError,
-    // MongoNetworkError) surface here as generic 500s otherwise. Flag them
-    // explicitly so it's obvious this is a connectivity issue, not a bug in
-    // the request itself — matches the Atlas "Connection failed [1006]"
-    // symptom seen in the Data Explorer.
-    if (err.name === "MongoServerSelectionError" || err.name === "MongoNetworkError" || err.name === "MongoTimeoutError") {
-      return res.status(503).json({
-        success: false,
-        message: "Could not reach the database. The cluster may be paused, or your IP may not be allowlisted in Atlas Network Access.",
-        debug: { errorName: err.name },
-      });
+    
+    const cycle = await PDCACycle.findOne({ _id: req.params.id, mentorId: req.user.id });
+    if (!cycle) return res.status(404).json({ success: false, message: "Growth Cycle not found." });
+    if (cycle.status !== "DRAFT") {
+      return res.status(400).json({ success: false, message: "Can only edit plans in DRAFT status." });
     }
 
+    const updatableFields = [
+      "planTitle", "planObjective", "planArea", "planExpectedOutcomes",
+      "planActivities", "planStartDate", "planTargetDate", "planInstructions"
+    ];
+    updatableFields.forEach(field => {
+      if (req.body[field] !== undefined) cycle[field] = req.body[field];
+    });
+
+    await cycle.save();
+    const populated = await cycle.populate("menteeId", "name email");
+    res.json({ success: true, cycle: populated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Mentor: Publish a plan
+router.patch("/pdca/:id/publish", async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid cycle id." });
+    }
+    
+    const cycle = await PDCACycle.findOne({ _id: req.params.id, mentorId: req.user.id });
+    if (!cycle) return res.status(404).json({ success: false, message: "Growth Cycle not found." });
+    if (cycle.status !== "DRAFT") {
+      return res.status(400).json({ success: false, message: "Can only publish DRAFT plans." });
+    }
+
+    cycle.status = "PLAN_PUBLISHED";
+    cycle.planPublishedAt = new Date();
+    await cycle.save();
+
+    const populated = await cycle.populate("menteeId", "name email");
+
+    try {
+      const { createAndEmitNotification } = await import("../socket.js");
+      await createAndEmitNotification({
+        recipientId: cycle.menteeId,
+        title: "New Growth Cycle Assigned",
+        body: `Your mentor published "${populated.planTitle}". Please review and start DO phase.`,
+        type: "in_app",
+      });
+    } catch (notifyErr) {
+      console.warn("[pdca:publish] notification failed:", notifyErr.message);
+    }
+
+    res.json({ success: true, cycle: populated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Mentor: Save Check draft
+router.patch("/pdca/:id/check/draft", async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid cycle id." });
+    }
+    
+    const cycle = await PDCACycle.findOne({ _id: req.params.id, mentorId: req.user.id });
+    if (!cycle) return res.status(404).json({ success: false, message: "Growth Cycle not found." });
+    if (!["DO_SUBMITTED", "CHECK_IN_PROGRESS"].includes(cycle.status)) {
+      return res.status(400).json({ success: false, message: "Not ready for Check phase." });
+    }
+
+    const updatableFields = [
+      "checkFeedback", "checkScore", "checkStrengths", "checkGaps", 
+      "checkRecommendations", "revisionRequired"
+    ];
+    updatableFields.forEach(field => {
+      if (req.body[field] !== undefined) cycle[field] = req.body[field];
+    });
+
+    cycle.status = "CHECK_IN_PROGRESS";
+    await cycle.save();
+    
+    const populated = await cycle.populate("menteeId", "name email");
+    res.json({ success: true, cycle: populated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Mentor: Submit Check
+router.patch("/pdca/:id/check/submit", async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid cycle id." });
+    }
+    
+    const cycle = await PDCACycle.findOne({ _id: req.params.id, mentorId: req.user.id });
+    if (!cycle) return res.status(404).json({ success: false, message: "Growth Cycle not found." });
+    if (!["DO_SUBMITTED", "CHECK_IN_PROGRESS"].includes(cycle.status)) {
+      return res.status(400).json({ success: false, message: "Not ready to submit Check." });
+    }
+
+    const updatableFields = [
+      "checkFeedback", "checkScore", "checkStrengths", "checkGaps", 
+      "checkRecommendations", "revisionRequired"
+    ];
+    updatableFields.forEach(field => {
+      if (req.body[field] !== undefined) cycle[field] = req.body[field];
+    });
+
+    cycle.checkedAt = new Date();
+    
+    // Revision Workflow
+    if (cycle.revisionRequired) {
+      cycle.status = "DO_IN_PROGRESS"; // Send back to Teacher
+    } else {
+      cycle.status = "CHECK_COMPLETED"; // Proceed to Act
+    }
+    
+    await cycle.save();
+    
+    const populated = await cycle.populate("menteeId", "name email");
+
+    try {
+      const { createAndEmitNotification } = await import("../socket.js");
+      await createAndEmitNotification({
+        recipientId: cycle.menteeId,
+        title: cycle.revisionRequired ? "Revision Required for Growth Cycle" : "Mentor Reviewed Growth Cycle",
+        body: cycle.revisionRequired 
+          ? `Your mentor requested revisions for Cycle ${cycle.cycleNumber}. Please update DO.`
+          : `Feedback added for Cycle ${cycle.cycleNumber}. Please submit your Act.`,
+        type: "in_app",
+      });
+    } catch (notifyErr) {
+      console.warn("[pdca:check_submit] notification failed:", notifyErr.message);
+    }
+
+    res.json({ success: true, cycle: populated });
+  } catch (err) {
     next(err);
   }
 });
@@ -165,7 +263,7 @@ router.get("/capstone", async (req, res, next) => {
     const submissions = await CapstoneSubmission.find({ mentorId: req.user.id }).sort({ milestone: 1 });
     const completedCount = submissions.filter(s => s.status === "approved" || s.status === "submitted").length;
     const currentStage = Math.min(completedCount + 1, 4);
-    
+
     const milestoneMap = new Map();
     submissions.forEach(s => milestoneMap.set(s.milestone, s));
 

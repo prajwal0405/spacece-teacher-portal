@@ -149,6 +149,21 @@ const curriculumAssignmentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "CurriculumPhase",
     },
+    assignedModules: [{ type: String }], // Array of module titles or IDs assigned
+    completedItems: [
+      {
+        phaseId: String,
+        moduleIndex: Number,
+        itemKey: String, // e.g. "phaseId_moduleIdx_deliverableIdx"
+        title: String,
+        completedAt: { type: Date, default: Date.now }
+      }
+    ],
+    progressPercent: {
+      type: Number,
+      default: 0
+    },
+    dueDate: Date,
     movementHistory: [
       {
         movedFromPhase: { type: mongoose.Schema.Types.ObjectId, ref: "CurriculumPhase" },

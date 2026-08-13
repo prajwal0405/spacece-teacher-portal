@@ -99,6 +99,7 @@ import { LessonPlan } from "./models/LessonPlan.js";
 import { LessonPlanAssignment } from "./models/LessonPlanAssignment.js";
 import { LessonCompletionReport } from "./models/LessonCompletionReport.js";
 import { ActivitySubmission } from "./models/ActivitySubmission.js";
+import { CurriculumAssignment } from "./models/Curriculum.js";
 import { Trainer } from "./models/Trainer.js";
 import { Feedback } from "./models/Feedback.js";
 import { FileAsset } from "./models/FileAsset.js";
@@ -2200,29 +2201,20 @@ app.post("/api/mentor/fellows/:id/claim", requireAuth, requireRole("mentor"), as
       updateFields["teacherProfile.center"] = mentor.mentorProfile.center;
     }
     
-    // Atomic lock: Only update if assignedMentor is null or not exists
+    // Atomic lock: claim the fellow
     const updatedFellow = await User.findOneAndUpdate(
       { 
         _id: fellowId, 
-        role: "teacher",
-        $or: [
-          { assignedMentor: { $exists: false } },
-          { assignedMentor: null }
-        ]
+        role: "teacher"
       },
       { $set: updateFields },
       { new: true }
     ).select("-passwordHash");
 
     if (!updatedFellow) {
-      // It means the fellow doesn't exist OR was already claimed by someone else
-      const existingFellow = await User.findOne({ _id: fellowId, role: "teacher" });
-      if (!existingFellow) {
-        return res.status(404).json({ message: "Teacher not found." });
-      } else {
-        return res.status(409).json({ message: "Conflict: This teacher has already been claimed by another mentor." });
-      }
+      return res.status(404).json({ message: "Teacher not found." });
     }
+
 
     // Add to assigned teachers of mentor
     await User.findByIdAndUpdate(
@@ -2289,15 +2281,31 @@ app.post("/api/mentor/fellows/:id/unclaim", requireAuth, requireRole("mentor"), 
 // end dnyaneshwari thorat
 
 // ── Mentor Fellow Activities APIs ──
-app.get("/api/mentor/activities", requireAuth, requireRole("mentor"), async (req, res, next) => {
+app.get("/api/mentor/activities", requireAuth, requireRole("mentor", "admin"), async (req, res, next) => {
   try {
-    // Find all assigned fellows for this mentor
     const mentorUser = await User.findById(req.user.id);
     const assignedTeachersInProfile = mentorUser?.mentorProfile?.assignedTeachers || [];
-    
+
+    const teachersByAssignedMentor = await User.find({ assignedMentor: req.user.id }).select("_id");
+    const curriculumAssignments = await CurriculumAssignment.find({ assignedBy: req.user.id }).select("fellow");
+
+    const rawIds = [
+      ...assignedTeachersInProfile,
+      ...teachersByAssignedMentor.map(t => t._id),
+      ...curriculumAssignments.map(ca => ca.fellow)
+    ].filter(id => id); // remove nulls/undefined
+
+    const teacherIds = [...new Set(rawIds.map(id => String(id)))]
+      .map(id => {
+        try { return new mongoose.Types.ObjectId(id); } catch (e) { return null; }
+      })
+      .filter(id => id !== null);
+
     const fellowOrQuery = [
       { mentor: req.user.id },
-      { teacher: { $in: assignedTeachersInProfile } }
+      { teacher: { $in: teacherIds } },
+      { mentor: null },
+      { mentor: { $exists: false } }
     ];
 
     const activities = await ActivitySubmission.find({ $or: fellowOrQuery })
@@ -2313,8 +2321,17 @@ app.get("/api/mentor/activities", requireAuth, requireRole("mentor"), async (req
   }
 });
 
+app.get("/api/mentor/activities/debug", async (req, res, next) => {
+  try {
+    const activities = await ActivitySubmission.find();
+    res.json({ count: activities.length, activities });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Seed realistic sample fellow submissions if queue is sparse
-app.post("/api/mentor/activities/seed-samples", requireAuth, requireRole("mentor"), async (req, res, next) => {
+app.post("/api/mentor/activities/seed-samples", requireAuth, requireRole("mentor", "admin"), async (req, res, next) => {
   try {
     const mentorUser = await User.findById(req.user.id);
     const assignedTeacherIds = mentorUser?.mentorProfile?.assignedTeachers || [];
@@ -2427,7 +2444,7 @@ app.post("/api/mentor/activities/seed-samples", requireAuth, requireRole("mentor
 });
 
 // Bulk Review Submissions (Bulk Approve / Bulk Flag)
-app.post("/api/mentor/activities/bulk-review", requireAuth, requireRole("mentor"), async (req, res, next) => {
+app.post("/api/mentor/activities/bulk-review", requireAuth, requireRole("mentor", "admin"), async (req, res, next) => {
   try {
     const { submissionIds, status, adminComments } = req.body;
     if (!Array.isArray(submissionIds) || submissionIds.length === 0) {
@@ -2455,7 +2472,7 @@ app.post("/api/mentor/activities/bulk-review", requireAuth, requireRole("mentor"
   }
 });
 
-app.patch("/api/mentor/activities/:id", requireAuth, requireRole("mentor"), async (req, res, next) => {
+app.patch("/api/mentor/activities/:id", requireAuth, requireRole("mentor", "admin"), async (req, res, next) => {
   try {
     const { status, adminComments, rating } = req.body;
     
@@ -6666,8 +6683,11 @@ import parentModuleAssignmentsRouter from "./routes/parentModuleAssignments.js";
 app.use("/api/parent-module-assignments", parentModuleAssignmentsRouter);
 import mentorTrackingRouter from "./routes/mentorTracking.js";
 import mentorCurriculumRouter from "./routes/mentorCurriculum.js";
+import teacherGrowthCycleRouter from "./routes/teacherGrowthCycle.js";
 app.use("/api/mentor/tracking", requireAuth, requireRole("mentor"), mentorTrackingRouter);
 app.use("/api/mentor/curriculum", requireAuth, mentorCurriculumRouter);
+app.use("/api/teacher/growth-cycles", requireAuth, requireRole("teacher", "fellow"), teacherGrowthCycleRouter);
+app.use("/api/teacher/growth-cycle", requireAuth, requireRole("teacher", "fellow"), teacherGrowthCycleRouter);
 
 app.post("/api/teacher/reports/draft-ai", requireAuth, requireRole("teacher"), async (req, res, next) => {
   try {

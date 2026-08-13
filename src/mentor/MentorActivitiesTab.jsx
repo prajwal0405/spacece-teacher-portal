@@ -44,7 +44,7 @@ export default function MentorActivitiesTab({ user, setToast }) {
   const fetchActivities = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/mentor/activities`, {
+      const res = await fetch(`${API_BASE_URL}/api/mentor/activities?t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -232,8 +232,8 @@ export default function MentorActivitiesTab({ user, setToast }) {
               Mentor Inbox
             </span>
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", margin: 0, letterSpacing: "-0.5px" }}>Fellow Activity Submissions</h1>
-          <p style={{ fontSize: 13, color: "#64748b", margin: "4px 0 0" }}>Review, grade, and provide actionable feedback on fellow deliverables.</p>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", margin: 0, letterSpacing: "-0.5px" }}>Teacher Activity Submissions</h1>
+          <p style={{ fontSize: 13, color: "#64748b", margin: "4px 0 0" }}>Review, grade, and provide actionable feedback on teacher/fellow deliverables.</p>
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>

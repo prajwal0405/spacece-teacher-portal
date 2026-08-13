@@ -3,18 +3,59 @@ import mongoose from "mongoose";
 const pdcaCycleSchema = new mongoose.Schema(
   {
     mentorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    // FIX: this field was missing entirely. The route creates cycles with a
-    // menteeId and later calls cycle.populate("menteeId", "name email") —
-    // without menteeId declared in the schema, Mongoose silently drops it on
-    // create() (strict mode) and then throws a StrictPopulateError on the
-    // populate() call, which is what was causing the generic 500.
     menteeId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     cycleNumber: { type: Number, required: true },
-    plan: { type: String, required: true },
-    do: { type: String, required: true },
-    check: { type: String, required: true },
-    act: { type: String, required: true },
-    status: { type: String, enum: ["In Progress", "Completed"], default: "Completed" },
+    
+    // PLAN Stage (Mentor)
+    planTitle: { type: String, required: true },
+    planObjective: { type: String },
+    planArea: { type: String },
+    planExpectedOutcomes: { type: String },
+    planActivities: { type: String },
+    planStartDate: { type: Date },
+    planTargetDate: { type: Date },
+    planInstructions: { type: String },
+    planPublishedAt: { type: Date },
+
+    // DO Stage (Teacher)
+    doActivitiesCompleted: { type: String },
+    doNotes: { type: String },
+    doReflections: { type: String },
+    doEvidence: { type: [String] }, // Array of URLs/links
+    doSubmittedAt: { type: Date },
+
+    // CHECK Stage (Mentor)
+    checkFeedback: { type: String },
+    checkScore: { type: String },
+    checkStrengths: { type: String },
+    checkGaps: { type: String },
+    checkRecommendations: { type: String },
+    revisionRequired: { type: Boolean, default: false },
+    checkedAt: { type: Date },
+
+    // ACT Stage (Teacher)
+    actCorrectiveActions: { type: String },
+    actChanged: { type: String },
+    actReflections: { type: String },
+    actEvidence: { type: [String] },
+    actSubmittedAt: { type: Date },
+
+    // Core Tracking
+    status: { 
+      type: String, 
+      enum: [
+        "DRAFT", 
+        "PLAN_PUBLISHED", 
+        "DO_IN_PROGRESS", 
+        "DO_SUBMITTED", 
+        "CHECK_IN_PROGRESS", 
+        "CHECK_COMPLETED", 
+        "ACT_IN_PROGRESS", 
+        "ACT_SUBMITTED", 
+        "COMPLETED"
+      ], 
+      default: "DRAFT" 
+    },
     date: { type: Date, default: Date.now },
   },
   { timestamps: true }
