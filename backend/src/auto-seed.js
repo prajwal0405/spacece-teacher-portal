@@ -11,6 +11,9 @@ import { Trainer } from "./models/Trainer.js";
 import { Batch } from "./models/Batch.js";
 import { AttendanceAlert } from "./models/AttendanceAlert.js";
 import { CurriculumUnit } from "./models/CurriculumUnit.js";
+import { ParentModule } from "./models/ParentModule.js";
+import { ParentModuleAssignment } from "./models/ParentModuleAssignment.js";
+import { ParentSessionAssignment } from "./models/ParentSessionAssignment.js";
 
 
 export async function autoSeed() {
@@ -85,7 +88,7 @@ export async function autoSeed() {
         status: "approved",
         teacherProfile: {
           center: center._id,
-          class: classRecord._id,
+          classes: [classRecord._id],
           qualification: input.qualification,
           subject: input.subject,
           experience: "Fresher",
@@ -327,10 +330,9 @@ export async function autoSeed() {
   }
 
   const attendanceAlertData = [
-    { teacher: teachers[0]._id, center: center._id, class: classRecord._id, attendanceRate: 72, threshold: 75, alertType: "low_attendance", severity: "warning", message: "Attendance below 75% threshold. Please ensure regular attendance." },
-    { teacher: teachers[1]._id, center: center._id, class: classRecord._id, attendanceRate: 58, threshold: 75, alertType: "critical_low_attendance", severity: "critical", message: "Attendance critically low at 58%. Immediate action required." },
-    { teacher: teachers[2]._id, center: center._id, class: classRecord._id, attendanceRate: 88, threshold: 75, alertType: "low_attendance", severity: "info", message: "Attendance recovering well at 88%. Keep it up!" },
-  ];
+    teachers[0] ? { teacher: teachers[0]._id, center: center._id, class: classRecord._id, attendanceRate: 72, threshold: 75, alertType: "low_attendance", severity: "warning", message: "Attendance below 75% threshold. Please ensure regular attendance." } : null,
+    teachers[1] ? { teacher: teachers[1]._id, center: center._id, class: classRecord._id, attendanceRate: 58, threshold: 75, alertType: "critical_low_attendance", severity: "critical", message: "Attendance critically low at 58%. Immediate action required." } : null,
+  ].filter(Boolean);
 
   for (const alertData of attendanceAlertData) {
     const existingAlert = await AttendanceAlert.findOne({ teacher: alertData.teacher, center: alertData.center, class: alertData.class, alertType: alertData.alertType });
@@ -399,6 +401,71 @@ export async function autoSeed() {
     ];
     await CurriculumUnit.insertMany(demoUnits);
     console.log("Seeded default curriculum units.");
+  }
+
+  // ── Seed Parent Capacity Building Modules ──
+  const parentModuleCount = await ParentModule.countDocuments();
+  if (parentModuleCount === 0) {
+    const parentModule = await ParentModule.create({
+      moduleNumber: 1,
+      title: "Positive Parenting & Early Child Development",
+      category: "Parenting",
+      ageGroup: "3-6 Years",
+      duration: "4 Weeks",
+      year: 1,
+      objective: "Empower parents with foundational knowledge and practical strategies for positive parenting, emotional nurturing, and supporting early child development at home.",
+      outcomes: [
+        "Understand key developmental milestones in early childhood",
+        "Implement positive discipline and constructive communication",
+        "Create a stimulating learning environment at home"
+      ],
+      sessions: [
+        {
+          sessionNumber: 1,
+          title: "Understanding Child Milestones & Emotional Needs",
+          objective: "Help parents understand physical, cognitive, and social-emotional milestones of 3-6 year olds.",
+          homePractice: "Observe your child's play habits for 15 minutes daily and note key interests.",
+          activities: [
+            { time: "10 mins", activity: "Icebreaker & Welcome", keyFocus: "Building rapport" },
+            { time: "20 mins", activity: "Interactive Presentation on Milestones", keyFocus: "Cognitive & Emotional development" },
+            { time: "15 mins", activity: "Group Discussion & Q&A", keyFocus: "Addressing parent concerns" }
+          ]
+        },
+        {
+          sessionNumber: 2,
+          title: "Positive Discipline & Effective Communication",
+          objective: "Guide parents on non-violent discipline techniques and active listening.",
+          homePractice: "Practice positive reinforcement twice daily when child demonstrates good behavior.",
+          activities: [
+            { time: "15 mins", activity: "Roleplay Scenarios", keyFocus: "Handling tantrums calmly" },
+            { time: "25 mins", activity: "Communication Strategies Workshop", keyFocus: "Active listening techniques" }
+          ]
+        }
+      ]
+    });
+
+    for (const t of teachers) {
+      await ParentModuleAssignment.findOneAndUpdate(
+        { module: parentModule._id, class: classRecord._id, teacher: t._id },
+        { module: parentModule._id, class: classRecord._id, teacher: t._id, assignedBy: admin._id },
+        { upsert: true, new: true }
+      );
+
+      for (const s of parentModule.sessions) {
+        await ParentSessionAssignment.findOneAndUpdate(
+          { teacher: t._id, module: parentModule._id, sessionNumber: s.sessionNumber },
+          {
+            teacher: t._id,
+            module: parentModule._id,
+            sessionNumber: s.sessionNumber,
+            status: "Pending",
+            assignedDate: new Date()
+          },
+          { upsert: true, new: true }
+        );
+      }
+    }
+    console.log("Seeded Parent Capacity Building modules and assignments.");
   }
 
   console.log("Automatic database seeding complete.");

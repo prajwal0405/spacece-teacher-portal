@@ -1812,26 +1812,49 @@ function ParentCapacityBuildingTab({ user, setToast }) {
                     <Badge children={status} color={sc.c} bg={sc.bg} />
                   </div>
 
-                  <table style={{ width: "100%", marginTop: 10, borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ background: "#fef3c7", textAlign: "left" }}>
-                        <th style={{ padding: "6px 8px" }}>Time</th>
-                        <th style={{ padding: "6px 8px" }}>Activity</th>
-                        <th style={{ padding: "6px 8px" }}>Key Focus</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sess.activities.map((a, i) => (
-                        <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                          <td style={{ padding: "6px 8px" }}>{a.time}</td>
-                          <td style={{ padding: "6px 8px" }}>{a.activity}</td>
-                          <td style={{ padding: "6px 8px" }}>{a.keyFocus}</td>
-                        </tr>
+                  {sess.content && sess.content.length > 0 && (
+                    <div style={{ marginTop: 12, background: "#f8fafc", padding: "12px 16px", borderRadius: 10, border: "1px solid #e2e8f0", fontSize: 12, color: "#334155" }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px", color: "#64748b", marginBottom: 8 }}>📖 Session Content & Key Guidance</div>
+                      {sess.content.map((c, ci) => (
+                        <div key={ci} style={{ marginBottom: 8 }}>
+                          {c.heading && <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 12, marginBottom: 2 }}>• {c.heading}</div>}
+                          {c.body && <div style={{ color: "#475569", lineHeight: "1.5" }}>{c.body}</div>}
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  )}
+
+                  {sess.activities && sess.activities.length > 0 && (
+                    <table style={{ width: "100%", marginTop: 12, borderCollapse: "collapse", fontSize: 12, borderRadius: 8, overflow: "hidden" }}>
+                      <thead>
+                        <tr style={{ background: "#fef3c7", textAlign: "left", color: "#92400e" }}>
+                          <th style={{ padding: "8px 10px", width: "80px" }}>Time</th>
+                          <th style={{ padding: "8px 10px" }}>Activity</th>
+                          <th style={{ padding: "8px 10px" }}>Key Focus</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sess.activities.map((a, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "8px 10px", fontWeight: 600, color: "#475569" }}>{a.time}</td>
+                            <td style={{ padding: "8px 10px", fontWeight: 700, color: "#1e293b" }}>{a.activity}</td>
+                            <td style={{ padding: "8px 10px", color: "#64748b" }}>{a.keyFocus}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {sess.reflection && (
+                    <div style={{ marginTop: 10, background: "#f0f9ff", borderLeft: "3px solid #0284c7", padding: "10px 14px", borderRadius: 8, fontSize: 12, color: "#0369a1" }}>
+                      💡 <strong>Reflection Focus:</strong> {sess.reflection}
+                    </div>
+                  )}
+
                   {sess.homePractice && (
-                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>Home Practice: {sess.homePractice}</div>
+                    <div style={{ marginTop: 10, background: "#ecfdf5", borderLeft: "3px solid #10b981", padding: "10px 14px", borderRadius: 8, fontSize: 12, color: "#047857", fontWeight: 600 }}>
+                      🏡 <strong>Home Practice for Parents:</strong> {sess.homePractice}
+                    </div>
                   )}
 
                   {/* Snehal change: Mark as Completed / Start Session button */}
