@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Modal, S, StatCard, StatusBadge, Toast, SearchBar, SectionCard } from "../components/Shared";
 import { getTeacherLessonPlans, submitLessonCompletion, uploadFile, getActivityBank, uploadActivityBank, getActivitySubmissions, submitActivityCompletion, deleteActivity, createActivityBank, getChildren } from "../services/api";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 const formatDate = (value) => {
   if (!value) return "Not scheduled";
   const d = new Date(value);
@@ -587,7 +589,7 @@ export function MarkCompleteModal({ activity, user, onSubmit, onClose }) {
     setIsDrafting(true);
     setError("");
     try {
-      const response = await fetch("http://localhost:5000/api/teacher/reports/draft-ai", {
+      const response = await fetch(`${API_BASE_URL}/api/teacher/reports/draft-ai`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1020,7 +1022,7 @@ function LessonDetailModal({ assignment, onClose, onSubmitComplete }) {
               return (
                 <div key={i} style={{ marginBottom: 12 }}>
                   <a
-                    href={`http://localhost:5000${f.publicUrl}`}
+                    href={`${API_BASE_URL}${f.publicUrl}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 12px", background: "#fff", border: "1px solid #10b981", borderRadius: 6, fontSize: 12, color: "#10b981", textDecoration: "none", fontWeight: 600 }}
@@ -1029,7 +1031,7 @@ function LessonDetailModal({ assignment, onClose, onSubmitComplete }) {
                   </a>
                   {isImage && (
                     <div style={{ marginTop: 8 }}>
-                      <img src={`http://localhost:5000${f.publicUrl}`} alt={f.originalName} style={{ maxWidth: "100%", maxHeight: "200px", borderRadius: 8, border: "1px solid #e5e7eb" }} />
+                      <img src={`${API_BASE_URL}${f.publicUrl}`} alt={f.originalName} style={{ maxWidth: "100%", maxHeight: "200px", borderRadius: 8, border: "1px solid #e5e7eb" }} />
                     </div>
                   )}
                 </div>
